@@ -4,4 +4,5 @@ public class UpdateSettingsRequest
 {
     public string? Name { get; set; }
     public string? ThemeAccentColor { get; set; }
+    public decimal? GstRate { get; set; }
 }

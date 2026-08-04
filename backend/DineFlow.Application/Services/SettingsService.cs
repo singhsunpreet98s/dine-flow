@@ -50,6 +50,9 @@ public class SettingsService : ISettingsService
         if (request.ThemeAccentColor is not null && request.ThemeAccentColor.Length > 0)
             settings.ThemeAccentColor = request.ThemeAccentColor;
 
+        if (request.GstRate.HasValue)
+            settings.GstRate = request.GstRate.Value;
+
         await _repo.SaveChangesAsync(ct);
 
         await _notifier.SendToGroupAsync(
@@ -61,6 +64,21 @@ public class SettingsService : ISettingsService
         return Result<SettingsDto>.Success(MapToDto(settings));
     }
 
+    public async Task<Result<SettingsDto>> UpdateLogoAsync(string logoUrl, CancellationToken ct = default)
+    {
+        var settings = await _repo.GetAsync(ct);
+        if (settings is null)
+        {
+            settings = new RestaurantSettings();
+            await _repo.AddAsync(settings, ct);
+        }
+
+        settings.LogoUrl = logoUrl;
+        await _repo.SaveChangesAsync(ct);
+
+        return Result<SettingsDto>.Success(MapToDto(settings));
+    }
+
     private static SettingsDto MapToDto(RestaurantSettings s) =>
-        new() { Name = s.Name, ThemeAccentColor = s.ThemeAccentColor };
+        new() { Name = s.Name, ThemeAccentColor = s.ThemeAccentColor, LogoUrl = s.LogoUrl, GstRate = s.GstRate };
 }

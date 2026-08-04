@@ -11,6 +11,8 @@ public class RestaurantSettingsConfiguration : IEntityTypeConfiguration<Restaura
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Name).IsRequired().HasMaxLength(200);
         builder.Property(r => r.ThemeAccentColor).IsRequired().HasMaxLength(50);
+        builder.Property(r => r.LogoUrl).HasMaxLength(2048);
+        builder.Property(r => r.GstRate).HasColumnType("decimal(5,2)");
         builder.HasQueryFilter(r => !r.IsDeleted);
     }
 }

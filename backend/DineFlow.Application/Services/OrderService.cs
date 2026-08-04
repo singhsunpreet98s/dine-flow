@@ -223,6 +223,12 @@ public class OrderService : IOrderService
             return Result<OrderDto>.Failure(ResultError.Conflict, ex.Message);
         }
 
+        if (request.Status == OrderStatus.Paid && request.PaymentMode.HasValue)
+            order.PaymentMode = request.PaymentMode.Value;
+
+        if (request.Status == OrderStatus.Paid && request.Note is not null)
+            order.Notes = request.Note;
+
         order.UpdatedBy = performedBy.ToString();
         order.UpdatedAt = DateTime.UtcNow;
 
@@ -233,6 +239,7 @@ public class OrderService : IOrderService
             Action = "StatusChanged",
             FromStatus = previousStatus,
             ToStatus = request.Status,
+            PaymentMode = request.Status == OrderStatus.Paid ? request.PaymentMode : null,
             PerformedBy = performedBy.ToString(),
             Timestamp = DateTime.UtcNow,
             CreatedBy = performedBy.ToString(),

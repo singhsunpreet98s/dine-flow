@@ -7,4 +7,5 @@ public interface ISettingsService
 {
     Task<Result<SettingsDto>> GetAsync(CancellationToken ct = default);
     Task<Result<SettingsDto>> UpdateAsync(UpdateSettingsRequest request, CancellationToken ct = default);
+    Task<Result<SettingsDto>> UpdateLogoAsync(string logoUrl, CancellationToken ct = default);
 }

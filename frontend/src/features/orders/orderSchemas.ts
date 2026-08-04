@@ -1,5 +1,5 @@
 import * as yup from 'yup'
-import { OrderChannel } from '@/types/enums'
+import { OrderChannel, PaymentMode } from '@/types/enums'
 
 export const createOrderSchema = yup.object({
   customerName: yup.string().trim().max(200).optional().default(''),
@@ -21,3 +21,13 @@ export const createOrderSchema = yup.object({
 })
 
 export type CreateOrderFormValues = yup.InferType<typeof createOrderSchema>
+
+export const paymentDialogSchema = yup.object({
+  paymentMode: yup
+    .mixed<PaymentMode>()
+    .oneOf(Object.values(PaymentMode))
+    .required('Please select a payment mode'),
+  note: yup.string().max(500).optional(),
+})
+
+export type PaymentDialogValues = yup.InferType<typeof paymentDialogSchema>
