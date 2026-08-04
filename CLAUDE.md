@@ -148,6 +148,22 @@ Channel is a display property only — all channels share the same order lifecyc
 - Shared form component `src/features/admin/components/CreateUserForm.tsx` used by AdminPage and UsersPage
 - Dynamic non-input state (item pickers, file uploads) stays as `useState` alongside the RHF form
 
+## Git Branch Naming
+
+All branches must follow this convention — never commit directly to `main`:
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| New feature | `feature/<short-description>` | `feature/kitchen-station-filters` |
+| Bug fix | `bugfix/<short-description>` | `bugfix/table-status-not-updating` |
+| Hotfix (production) | `hotfix/<short-description>` | `hotfix/order-total-calculation` |
+| Chore / refactor | `chore/<short-description>` | `chore/migrate-forms-to-rhf` |
+
+Rules:
+- Use kebab-case only — no spaces, no underscores, no capital letters
+- Description must be meaningful — `feature/fix` or `bugfix/bug1` are not acceptable
+- Branch off `main` unless told otherwise
+
 ## Testing Strategy
 
 - **xUnit**: pure unit tests for domain logic; integration tests hit a real test SQL Server (no mocked EF)
