@@ -1,6 +1,6 @@
 import { baseApi } from '@/app/api'
 import type { OrderDto, CreateOrderRequest, AddItemsRequest, AssignWaiterRequest, AppUserDto } from '@/types/api'
-import type { OrderStatus } from '@/types/enums'
+import type { OrderStatus, PaymentMode } from '@/types/enums'
 
 export const ordersApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -15,11 +15,11 @@ export const ordersApi = baseApi.injectEndpoints({
       query: (id) => `orders/${id}`,
       providesTags: (_result, _err, id) => [{ type: 'Order' as const, id }],
     }),
-    updateOrderStatus: build.mutation<OrderDto, { id: string; status: OrderStatus }>({
-      query: ({ id, status }) => ({
+    updateOrderStatus: build.mutation<OrderDto, { id: string; status: OrderStatus; paymentMode?: PaymentMode; note?: string }>({
+      query: ({ id, status, paymentMode, note }) => ({
         url: `orders/${id}/status`,
         method: 'PATCH',
-        body: { status },
+        body: { status, paymentMode, note },
       }),
       invalidatesTags: (_result, _err, { id }) => [{ type: 'Order' as const, id }],
     }),

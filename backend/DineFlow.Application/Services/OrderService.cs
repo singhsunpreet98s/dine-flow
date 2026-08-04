@@ -226,6 +226,9 @@ public class OrderService : IOrderService
         if (request.Status == OrderStatus.Paid && request.PaymentMode.HasValue)
             order.PaymentMode = request.PaymentMode.Value;
 
+        if (request.Status == OrderStatus.Paid && request.Note is not null)
+            order.Notes = request.Note;
+
         order.UpdatedBy = performedBy.ToString();
         order.UpdatedAt = DateTime.UtcNow;
 

@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { Clock, Pencil, ChevronRight, Loader2, Receipt } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { OrderDto } from '@/types/api'
-import { OrderChannel, OrderStatus, ORDER_STATUS_LABEL, UserRole } from '@/types/enums'
+import { OrderChannel, OrderStatus, PaymentMode, ORDER_STATUS_LABEL, UserRole } from '@/types/enums'
+import { PaymentDialog } from '@/features/orders/PaymentDialog'
+import type { PaymentDialogValues } from '@/features/orders/orderSchemas'
 import { Badge } from '@/components/ui/badge'
 import type { BadgeProps } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -113,6 +116,8 @@ export function OrderCard({ order }: OrderCardProps) {
   const { elapsed, isDelayed } = useOrderTimer(order.createdAt)
   const [updateStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation()
 
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+
   const nextStatus = STATUS_NEXT[order.status]
   const actionLabel = STATUS_ACTION_LABEL[order.status]
   const canAdvance =
@@ -131,11 +136,26 @@ export function OrderCard({ order }: OrderCardProps) {
 
   function handleAdvanceStatus() {
     if (!nextStatus) return
+    if (order.status === OrderStatus.Billed) {
+      setShowPaymentDialog(true)
+      return
+    }
     updateStatus({ id: order.id, status: nextStatus })
   }
 
+  async function handlePaymentConfirm(values: PaymentDialogValues) {
+    await updateStatus({
+      id: order.id,
+      status: OrderStatus.Paid,
+      paymentMode: values.paymentMode as PaymentMode,
+      note: values.note ?? undefined,
+    }).unwrap()
+    setShowPaymentDialog(false)
+  }
+
   return (
-    // h-full + flex-col lets CSS Grid stretch all cards in a row to the same height
+    <>
+    {/* h-full + flex-col lets CSS Grid stretch all cards in a row to the same height */}
     <div
       className={`
         flex h-full overflow-hidden rounded-xl border bg-card
@@ -267,5 +287,16 @@ export function OrderCard({ order }: OrderCardProps) {
         </div>
       </div>
     </div>
+
+    {showPaymentDialog && (
+      <PaymentDialog
+        orderNumber={order.orderNumber}
+        totalAmount={order.totalAmount}
+        isLoading={isUpdating}
+        onConfirm={handlePaymentConfirm}
+        onCancel={() => setShowPaymentDialog(false)}
+      />
+    )}
+    </>
   )
 }

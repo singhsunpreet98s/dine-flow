@@ -37,6 +37,8 @@ export enum PaymentMode {
   Card = 'Card',
   UPI = 'UPI',
   Other = 'Other',
+  DebitCard = 'DebitCard',
+  CreditCard = 'CreditCard',
 }
 
 export enum UserRole {

@@ -16,5 +16,9 @@ public class UpdateOrderStatusRequestValidator : AbstractValidator<UpdateOrderSt
                 .NotNull()
                 .WithMessage("PaymentMode is required when setting status to Paid.");
         });
+
+        RuleFor(x => x.Note)
+            .MaximumLength(500)
+            .When(x => x.Note is not null);
     }
 }
