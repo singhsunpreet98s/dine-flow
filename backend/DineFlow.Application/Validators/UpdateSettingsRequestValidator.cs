@@ -26,5 +26,12 @@ public class UpdateSettingsRequestValidator : AbstractValidator<UpdateSettingsRe
                 .Must(c => ValidAccentColors.Contains(c))
                 .WithMessage($"ThemeAccentColor must be one of: {string.Join(", ", ValidAccentColors)}.");
         });
+
+        When(r => r.GstRate.HasValue, () =>
+        {
+            RuleFor(r => r.GstRate!.Value)
+                .InclusiveBetween(0m, 100m)
+                .WithMessage("GstRate must be between 0 and 100.");
+        });
     }
 }

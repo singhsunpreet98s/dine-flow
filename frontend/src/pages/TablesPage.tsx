@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { getSignalRConnection } from '@/app/signalr'
 import { useGetLiveFloorsQuery } from '@/features/tables/tablesLiveApi'
@@ -149,9 +150,19 @@ function OrderDetailDialog({ table, onClose, timeZoneId }: OrderDetailDialogProp
           </span>
         </div>
 
+        <div className="mt-4">
+          <Link
+            to={`/orders/${order.orderId}/bill`}
+            className="block w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium text-center transition-colors hover:bg-primary/90"
+            onClick={onClose}
+          >
+            View Bill
+          </Link>
+        </div>
+
         <button
           onClick={onClose}
-          className="mt-4 w-full py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors"
+          className="mt-2 w-full py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors"
         >
           Close
         </button>

@@ -1,4 +1,4 @@
-import { Clock, Pencil, ChevronRight, Loader2 } from 'lucide-react'
+import { Clock, Pencil, ChevronRight, Loader2, Receipt } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { OrderDto } from '@/types/api'
 import { OrderChannel, OrderStatus, ORDER_STATUS_LABEL, UserRole } from '@/types/enums'
@@ -123,6 +123,12 @@ export function OrderCard({ order }: OrderCardProps) {
   const canEdit =
     role === UserRole.Admin || role === UserRole.Manager || role === UserRole.Waiter
 
+  const canViewBill =
+    (role === UserRole.Admin || role === UserRole.Manager || role === UserRole.Waiter) &&
+    (order.status === OrderStatus.Billed ||
+      order.status === OrderStatus.Paid ||
+      order.status === OrderStatus.Closed)
+
   function handleAdvanceStatus() {
     if (!nextStatus) return
     updateStatus({ id: order.id, status: nextStatus })
@@ -214,6 +220,15 @@ export function OrderCard({ order }: OrderCardProps) {
               <span className="text-sm font-bold tabular-nums text-foreground">
                 {formatAmount(order.totalAmount)}
               </span>
+              {canViewBill && (
+                <Link
+                  to={`/orders/${order.id}/bill`}
+                  className="flex items-center gap-0.5 text-xs font-medium text-primary hover:underline"
+                >
+                  <Receipt className="h-3 w-3" />
+                  Bill
+                </Link>
+              )}
               {canEdit && (
                 <Link
                   to={`/orders/${order.id}/edit`}

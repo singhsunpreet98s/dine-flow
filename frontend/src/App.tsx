@@ -22,6 +22,7 @@ import { OrdersPage } from '@/pages/OrdersPage'
 import { AddOrderPage } from '@/pages/AddOrderPage'
 import { EditOrderPage } from '@/pages/EditOrderPage'
 import { TablesPage } from '@/pages/TablesPage'
+import { BillPage } from '@/pages/BillPage'
 import { UserRole } from '@/types/enums'
 import { setAccentColor, type AccentColor } from '@/features/ui/uiSlice'
 import { useGetSettingsQuery } from '@/features/settings/settingsApi'
@@ -142,6 +143,14 @@ function DashboardRoutes() {
           element={
             <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter]}>
               <EditOrderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/:id/bill"
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter]}>
+              <BillPage />
             </ProtectedRoute>
           }
         />

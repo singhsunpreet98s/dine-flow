@@ -284,3 +284,10 @@ export interface TableStatusChangedDto {
   status: string
   orderId: string | null
 }
+
+export interface SettingsDto {
+  name: string
+  themeAccentColor: string
+  logoUrl: string | null
+  gstRate: number
+}

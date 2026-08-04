@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Moon, Sun, Check } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setAccentColor, setTheme, type AccentColor } from '@/features/ui/uiSlice'
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { useGetSettingsQuery, useUpdateSettingsMutation } from '@/features/settings/settingsApi'
+import { useGetSettingsQuery, useUpdateSettingsMutation, useUploadLogoMutation } from '@/features/settings/settingsApi'
 import {
   Select,
   SelectContent,
@@ -191,11 +191,15 @@ export function RestaurantSettingsPage() {
   const [updateName,     { isLoading: isSavingName     }] = useUpdateSettingsMutation()
   const [updateColor,    { isLoading: isSavingColor    }] = useUpdateSettingsMutation()
   const [updateTimezone, { isLoading: isSavingTimezone }] = useUpdateTimezoneMutation()
+  const [uploadLogo,     { isLoading: isUploadingLogo  }] = useUploadLogoMutation()
 
   const [localName,           setLocalName]           = useState('')
   const [nameSaveStatus,      setNameSaveStatus]      = useState<SaveStatus>('idle')
   const [localTimeZoneId,     setLocalTimeZoneId]     = useState(currentTimeZoneId)
   const [timezoneSaveStatus,  setTimezoneSaveStatus]  = useState<SaveStatus>('idle')
+  const [logoUploadStatus,    setLogoUploadStatus]    = useState<SaveStatus>('idle')
+
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (data) {
@@ -203,6 +207,22 @@ export function RestaurantSettingsPage() {
       setLocalName(data.name)
     }
   }, [data, dispatch])
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploadStatus('idle')
+    const formData = new FormData()
+    formData.append('logo', file)
+    try {
+      await uploadLogo(formData).unwrap()
+      setLogoUploadStatus('success')
+    } catch {
+      setLogoUploadStatus('error')
+    }
+    // Reset so the same file can be re-uploaded if needed
+    if (logoFileInputRef.current) logoFileInputRef.current.value = ''
+  }
 
   async function handleSaveName() {
     setNameSaveStatus('idle')
@@ -239,6 +259,55 @@ export function RestaurantSettingsPage() {
   return (
     <div className="p-6">
       <h1 className="mb-6 text-2xl font-bold">Restaurant Settings</h1>
+
+      {/* ── Restaurant Logo ── */}
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Restaurant Logo
+        </h2>
+        <div className="flex flex-col gap-3">
+          {data?.logoUrl ? (
+            <img
+              src={data.logoUrl}
+              alt="Restaurant logo"
+              className="h-24 w-auto max-w-xs rounded border border-border object-contain"
+            />
+          ) : (
+            <button
+              type="button"
+              className="flex h-24 w-48 cursor-pointer items-center justify-center rounded border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              onClick={() => logoFileInputRef.current?.click()}
+            >
+              <span className="text-xs">Click to upload logo</span>
+            </button>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setLogoUploadStatus('idle'); logoFileInputRef.current?.click() }}
+              disabled={isUploadingLogo}
+            >
+              {isUploadingLogo ? 'Uploading…' : data?.logoUrl ? 'Change Logo' : 'Upload Logo'}
+            </Button>
+            <input
+              ref={logoFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
+          </div>
+
+          {logoUploadStatus === 'success' && (
+            <p className="text-sm text-green-600 dark:text-green-400">Logo uploaded successfully.</p>
+          )}
+          {logoUploadStatus === 'error' && (
+            <p className="text-sm text-destructive">Failed to upload logo. Please try again.</p>
+          )}
+        </div>
+      </section>
 
       {/* ── Restaurant Name ── */}
       <section className="mb-8">
