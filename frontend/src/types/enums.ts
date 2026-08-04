@@ -72,7 +72,7 @@ export const TABLE_STATUS_RING: Record<TableStatus, string> = {
 
 export const TABLE_STATUS_CLASSES: Record<string, string> = {
   Available: 'bg-gray-100 border-2 border-gray-300 text-gray-600 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400',
-  Occupied:  'bg-indigo-600 border-2 border-indigo-700 text-white dark:bg-indigo-700 dark:border-indigo-800',
+  Occupied:  'bg-primary border-2 border-primary/80 text-primary-foreground',
   Reserved:  'bg-amber-100 border-2 border-amber-400 text-amber-800 dark:bg-amber-900 dark:border-amber-600 dark:text-amber-200',
   Cleaning:  'bg-blue-100 border-2 border-blue-400 text-blue-800 dark:bg-blue-900 dark:border-blue-600 dark:text-blue-200',
   Inactive:  'bg-gray-50 border-2 border-gray-200 text-gray-300 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-600',

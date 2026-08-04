@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
 import {
   useCreateMenuCategoryMutation,
   useUpdateMenuCategoryMutation,
 } from '@/features/menu/menuApi'
-import type { MenuCategoryDto, CreateMenuCategoryRequest } from '@/types/api'
+import type { MenuCategoryDto } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Sheet,
   SheetContent,
@@ -14,7 +15,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { FormField } from '@/components/shared/FormField'
+import { ToggleSwitch } from '@/components/shared/ToggleSwitch'
 import { toast } from '@/components/ui/toaster'
+import { menuCategorySchema, type MenuCategoryFormValues } from '@/features/menu/menuSchemas'
 
 interface MenuCategorySheetProps {
   open: boolean
@@ -22,68 +26,56 @@ interface MenuCategorySheetProps {
   editCategory?: MenuCategoryDto | null
 }
 
-interface FormValues {
-  name: string
-  sortOrder: string
-  isActive: boolean
-}
-
-const EMPTY_FORM: FormValues = { name: '', sortOrder: '0', isActive: true }
-
 export function MenuCategorySheet({ open, onOpenChange, editCategory }: MenuCategorySheetProps) {
   const isEdit = editCategory != null
   const [createCategory, { isLoading: isCreating }] = useCreateMenuCategoryMutation()
   const [updateCategory, { isLoading: isUpdating }] = useUpdateMenuCategoryMutation()
   const isLoading = isCreating || isUpdating
 
-  const [form, setForm] = useState<FormValues>(EMPTY_FORM)
-  const [error, setError] = useState('')
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    setError,
+    formState: { errors },
+  } = useForm<MenuCategoryFormValues>({
+    resolver: yupResolver(menuCategorySchema),
+    defaultValues: { name: '', sortOrder: 0, isActive: true },
+  })
 
+  const isActive = watch('isActive')
+
+  // Populate form when opening for edit, reset when opening for create
   useEffect(() => {
-    if (editCategory) {
-      setForm({
-        name: editCategory.name,
-        sortOrder: editCategory.sortOrder.toString(),
-        isActive: editCategory.isActive,
-      })
-    } else {
-      setForm(EMPTY_FORM)
+    if (open) {
+      reset(
+        editCategory
+          ? { name: editCategory.name, sortOrder: editCategory.sortOrder, isActive: editCategory.isActive }
+          : { name: '', sortOrder: 0, isActive: true }
+      )
     }
-    setError('')
-  }, [editCategory, open])
+  }, [open, editCategory, reset])
 
-  function updateField<K extends keyof FormValues>(field: K, value: FormValues[K]) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    const payload: CreateMenuCategoryRequest = {
-      name: form.name.trim(),
-      sortOrder: parseInt(form.sortOrder, 10) || 0,
-      isActive: form.isActive,
-    }
+  async function handleSave(values: MenuCategoryFormValues) {
     try {
       if (isEdit && editCategory) {
-        await updateCategory({ id: editCategory.id, data: payload }).unwrap()
+        await updateCategory({ id: editCategory.id, data: values }).unwrap()
         toast.success('Category updated', 'Your changes have been saved.')
       } else {
-        await createCategory(payload).unwrap()
+        await createCategory(values).unwrap()
         toast.success('Category added', 'The category is now available.')
       }
       onOpenChange(false)
     } catch (err: unknown) {
       const apiError = err as { data?: { message?: string } }
-      setError(apiError?.data?.message ?? 'Failed to save category.')
+      setError('root', { message: apiError?.data?.message ?? 'Failed to save category.' })
     }
   }
 
   function handleSheetChange(nextOpen: boolean) {
-    if (!nextOpen) {
-      setForm(EMPTY_FORM)
-      setError('')
-    }
+    if (!nextOpen) reset({ name: '', sortOrder: 0, isActive: true })
     onOpenChange(nextOpen)
   }
 
@@ -97,55 +89,32 @@ export function MenuCategorySheet({ open, onOpenChange, editCategory }: MenuCate
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0">
+        <form onSubmit={handleSubmit(handleSave)} className="flex flex-1 flex-col min-h-0">
           <div className="flex-1 min-h-0 overflow-y-auto space-y-5 px-6 pb-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="cat-name">Name *</Label>
-              <Input
-                id="cat-name"
-                placeholder="e.g. Starters"
-                value={form.name}
-                onChange={(e) => updateField('name', e.target.value)}
-                required
-              />
-            </div>
+            <FormField label="Name" htmlFor="cat-name" error={errors.name?.message} required>
+              <Input id="cat-name" placeholder="e.g. Starters" {...register('name')} />
+            </FormField>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="cat-order">Display Order</Label>
-              <Input
-                id="cat-order"
-                type="number"
-                min="0"
-                value={form.sortOrder}
-                onChange={(e) => updateField('sortOrder', e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Lower numbers appear first.</p>
-            </div>
+            <FormField
+              label="Display Order"
+              htmlFor="cat-order"
+              error={errors.sortOrder?.message}
+              hint="Lower numbers appear first."
+            >
+              <Input id="cat-order" type="number" min="0" {...register('sortOrder')} />
+            </FormField>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Active</Label>
-                <p className="text-xs text-muted-foreground">Show this category on the menu</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateField('isActive', !form.isActive)}
-                className={`relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  form.isActive ? 'bg-green-500' : 'bg-muted-foreground/40'
-                }`}
-                aria-label="Toggle active"
-              >
-                <span
-                  className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                    form.isActive ? 'left-6' : 'left-1'
-                  }`}
-                />
-              </button>
-            </div>
+            <ToggleSwitch
+              id="cat-active"
+              label="Active"
+              description="Show this category on the menu"
+              checked={isActive ?? true}
+              onChange={(v) => setValue('isActive', v)}
+            />
 
-            {error && (
+            {errors.root && (
               <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
+                {errors.root.message}
               </p>
             )}
           </div>

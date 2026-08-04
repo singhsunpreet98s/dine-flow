@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
 import {
   useCreateMenuItemMutation,
   useGetMenuCategoriesQuery,
@@ -7,7 +9,6 @@ import {
 import type { MenuItemDto } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -22,7 +23,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { FormField } from '@/components/shared/FormField'
+import { ToggleSwitch } from '@/components/shared/ToggleSwitch'
 import { toast } from '@/components/ui/toaster'
+import { menuItemSchema, type MenuItemFormValues } from '@/features/menu/menuSchemas'
 
 interface MenuItemSheetProps {
   open: boolean
@@ -30,22 +34,13 @@ interface MenuItemSheetProps {
   editItem?: MenuItemDto | null
 }
 
-interface FormValues {
-  name: string
-  description: string
-  price: string
-  categoryId: string
-  isAvailable: boolean
-  displayOrder: string
-}
-
-const EMPTY_FORM: FormValues = {
+const DEFAULT_VALUES: MenuItemFormValues = {
   name: '',
   description: '',
-  price: '',
+  price: 0,
   categoryId: '',
   isAvailable: true,
-  displayOrder: '0',
+  displayOrder: 0,
 }
 
 export function MenuItemSheet({ open, onOpenChange, editItem }: MenuItemSheetProps) {
@@ -55,32 +50,45 @@ export function MenuItemSheet({ open, onOpenChange, editItem }: MenuItemSheetPro
   const [updateMenuItem, { isLoading: isUpdating }] = useUpdateMenuItemMutation()
   const isLoading = isCreating || isUpdating
 
-  const [form, setForm] = useState<FormValues>(EMPTY_FORM)
+  // Image state is managed outside RHF — file inputs can't be registered with RHF
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Populate form when editing
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    setError,
+    formState: { errors },
+  } = useForm<MenuItemFormValues>({
+    resolver: yupResolver(menuItemSchema),
+    defaultValues: DEFAULT_VALUES,
+  })
+
+  const isAvailable = watch('isAvailable')
+
   useEffect(() => {
-    if (editItem) {
-      setForm({
-        name: editItem.name,
-        description: editItem.description ?? '',
-        price: editItem.price.toString(),
-        categoryId: editItem.categoryId,
-        isAvailable: editItem.isAvailable,
-        displayOrder: editItem.displayOrder.toString(),
-      })
-      setImagePreview(editItem.photoUrl)
-      setImageFile(null)
-    } else {
-      setForm(EMPTY_FORM)
-      setImagePreview(null)
+    if (open) {
+      reset(
+        editItem
+          ? {
+              name: editItem.name,
+              description: editItem.description ?? '',
+              price: editItem.price,
+              categoryId: editItem.categoryId,
+              isAvailable: editItem.isAvailable,
+              displayOrder: editItem.displayOrder,
+            }
+          : DEFAULT_VALUES
+      )
+      setImagePreview(editItem?.photoUrl ?? null)
       setImageFile(null)
     }
-    setError('')
-  }, [editItem, open])
+  }, [open, editItem, reset])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -89,46 +97,39 @@ export function MenuItemSheet({ open, onOpenChange, editItem }: MenuItemSheetPro
     setImagePreview(URL.createObjectURL(file))
   }
 
-  function updateField<K extends keyof FormValues>(field: K, value: FormValues[K]) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  function buildFormData(): FormData {
+  function buildFormData(values: MenuItemFormValues): FormData {
     const fd = new FormData()
-    fd.append('name', form.name)
-    fd.append('description', form.description)
-    fd.append('price', form.price)
-    fd.append('categoryId', form.categoryId)
-    fd.append('isAvailable', String(form.isAvailable))
-    fd.append('displayOrder', form.displayOrder)
+    fd.append('name', values.name)
+    fd.append('description', values.description ?? '')
+    fd.append('price', String(values.price))
+    fd.append('categoryId', values.categoryId)
+    fd.append('isAvailable', String(values.isAvailable))
+    fd.append('displayOrder', String(values.displayOrder))
     if (imageFile) fd.append('image', imageFile)
     return fd
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
+  async function handleSave(values: MenuItemFormValues) {
     try {
       if (isEdit && editItem) {
-        await updateMenuItem({ id: editItem.id, data: buildFormData() }).unwrap()
+        await updateMenuItem({ id: editItem.id, data: buildFormData(values) }).unwrap()
         toast.success('Menu item updated', 'Your changes have been saved.')
       } else {
-        await createMenuItem(buildFormData()).unwrap()
+        await createMenuItem(buildFormData(values)).unwrap()
         toast.success('Menu item added', 'The item has been added to your menu.')
       }
       onOpenChange(false)
     } catch (err: unknown) {
       const apiError = err as { data?: { message?: string } }
-      setError(apiError?.data?.message ?? 'Failed to save menu item.')
+      setError('root', { message: apiError?.data?.message ?? 'Failed to save menu item.' })
     }
   }
 
   function handleSheetChange(nextOpen: boolean) {
     if (!nextOpen) {
-      setForm(EMPTY_FORM)
+      reset(DEFAULT_VALUES)
       setImageFile(null)
       setImagePreview(null)
-      setError('')
     }
     onOpenChange(nextOpen)
   }
@@ -145,12 +146,12 @@ export function MenuItemSheet({ open, onOpenChange, editItem }: MenuItemSheetPro
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0">
-          {/* SCROLLABLE body — only this div scrolls */}
+        <form onSubmit={handleSubmit(handleSave)} className="flex flex-1 flex-col min-h-0">
+          {/* Scrollable body */}
           <div className="flex-1 min-h-0 overflow-y-auto space-y-5 px-6 pb-4">
-            {/* Image upload */}
+            {/* Image upload — not a registered RHF field */}
             <div className="space-y-1.5">
-              <Label>Photo</Label>
+              <span className="text-sm font-medium leading-none">Photo</span>
               <div
                 className="relative flex h-36 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/50 transition-colors hover:bg-muted"
                 onClick={() => fileInputRef.current?.click()}
@@ -173,111 +174,89 @@ export function MenuItemSheet({ open, onOpenChange, editItem }: MenuItemSheetPro
               />
             </div>
 
-            {/* Name */}
-            <div className="space-y-1.5">
-              <Label htmlFor="mi-name">Name *</Label>
-              <Input
-                id="mi-name"
-                placeholder="e.g. Paneer Tikka"
-                value={form.name}
-                onChange={(e) => updateField('name', e.target.value)}
-                required
-              />
-            </div>
+            <FormField label="Name" htmlFor="mi-name" error={errors.name?.message} required>
+              <Input id="mi-name" placeholder="e.g. Paneer Tikka" {...register('name')} />
+            </FormField>
 
-            {/* Description */}
-            <div className="space-y-1.5">
-              <Label htmlFor="mi-description">Description</Label>
+            <FormField
+              label="Description"
+              htmlFor="mi-description"
+              error={errors.description?.message}
+            >
               <Input
                 id="mi-description"
                 placeholder="Short description..."
-                value={form.description}
-                onChange={(e) => updateField('description', e.target.value)}
+                {...register('description')}
               />
-            </div>
+            </FormField>
 
-            {/* Price */}
-            <div className="space-y-1.5">
-              <Label htmlFor="mi-price">Price (₹) *</Label>
+            <FormField label="Price (₹)" htmlFor="mi-price" error={errors.price?.message} required>
               <Input
                 id="mi-price"
                 type="number"
                 min="0"
                 step="0.01"
                 placeholder="0.00"
-                value={form.price}
-                onChange={(e) => updateField('price', e.target.value)}
-                required
+                {...register('price')}
               />
-            </div>
+            </FormField>
 
-            {/* Category */}
-            <div className="space-y-1.5">
-              <Label htmlFor="mi-category">Category *</Label>
-              <Select
-                value={form.categoryId}
-                onValueChange={(v) => updateField('categoryId', v)}
-              >
-                <SelectTrigger id="mi-category">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {categories.length === 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  No categories yet. An Admin must create a category before adding items.
-                </p>
+            <Controller
+              name="categoryId"
+              control={control}
+              render={({ field }) => (
+                <FormField
+                  label="Category"
+                  htmlFor="mi-category"
+                  error={errors.categoryId?.message}
+                  required
+                  hint={
+                    categories.length === 0
+                      ? 'No categories yet. An Admin must create a category first.'
+                      : undefined
+                  }
+                >
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="mi-category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
               )}
-            </div>
+            />
 
-            {/* Display order */}
-            <div className="space-y-1.5">
-              <Label htmlFor="mi-order">Display Order</Label>
-              <Input
-                id="mi-order"
-                type="number"
-                min="0"
-                value={form.displayOrder}
-                onChange={(e) => updateField('displayOrder', e.target.value)}
-              />
-            </div>
+            <FormField
+              label="Display Order"
+              htmlFor="mi-order"
+              error={errors.displayOrder?.message}
+              hint="Lower numbers appear first."
+            >
+              <Input id="mi-order" type="number" min="0" {...register('displayOrder')} />
+            </FormField>
 
-            {/* Is Available toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Available</Label>
-                <p className="text-xs text-muted-foreground">Visible and orderable by staff</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateField('isAvailable', !form.isAvailable)}
-                className={`relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  form.isAvailable ? 'bg-green-500' : 'bg-muted-foreground/40'
-                }`}
-                aria-label="Toggle availability"
-              >
-                <span
-                  className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                    form.isAvailable ? 'left-6' : 'left-1'
-                  }`}
-                />
-              </button>
-            </div>
+            <ToggleSwitch
+              id="mi-available"
+              label="Available"
+              description="Visible and orderable by staff"
+              checked={isAvailable ?? true}
+              onChange={(v) => setValue('isAvailable', v)}
+            />
 
-            {error && (
+            {errors.root && (
               <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
+                {errors.root.message}
               </p>
             )}
           </div>
 
-          {/* FIXED footer — never scrolls */}
+          {/* Fixed footer */}
           <div className="shrink-0 border-t border-border bg-background px-6 py-4 flex gap-3">
             <Button
               type="button"

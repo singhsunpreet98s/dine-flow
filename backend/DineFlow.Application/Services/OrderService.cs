@@ -14,6 +14,7 @@ public class OrderService : IOrderService
     private readonly IAuditLogRepository _auditLogs;
     private readonly IOrderHubNotifier _hub;
     private readonly IAppUserRepository _users;
+    private readonly IFloorRepository _floors;
     private readonly IValidator<CreateOrderRequest> _createVal;
     private readonly IValidator<AddItemsRequest> _addItemsVal;
     private readonly IValidator<UpdateOrderStatusRequest> _updateStatusVal;
@@ -24,6 +25,7 @@ public class OrderService : IOrderService
         IAuditLogRepository auditLogs,
         IOrderHubNotifier hub,
         IAppUserRepository users,
+        IFloorRepository floors,
         IValidator<CreateOrderRequest> createVal,
         IValidator<AddItemsRequest> addItemsVal,
         IValidator<UpdateOrderStatusRequest> updateStatusVal)
@@ -33,6 +35,7 @@ public class OrderService : IOrderService
         _auditLogs = auditLogs;
         _hub = hub;
         _users = users;
+        _floors = floors;
         _createVal = createVal;
         _addItemsVal = addItemsVal;
         _updateStatusVal = updateStatusVal;
@@ -60,9 +63,9 @@ public class OrderService : IOrderService
         if (!v.IsValid)
             return Result<OrderDto>.Failure(ResultError.Validation, string.Join("; ", v.Errors.Select(e => e.ErrorMessage)));
 
-        if (request.TableId.HasValue)
+        if (request.RestaurantTableId.HasValue)
         {
-            var tableOccupied = await _orders.HasActiveOrderForTableAsync(request.TableId.Value, ct);
+            var tableOccupied = await _orders.HasActiveOrderForRestaurantTableAsync(request.RestaurantTableId.Value, ct);
             if (tableOccupied)
                 return Result<OrderDto>.Failure(
                     ResultError.Conflict,
@@ -75,7 +78,6 @@ public class OrderService : IOrderService
             Channel = request.Channel,
             CustomerName = request.CustomerName,
             MemberCount = request.MemberCount,
-            TableId = request.TableId,
             RestaurantTableId = request.RestaurantTableId,
             CreatedBy = performedBy.ToString(),
             UpdatedBy = performedBy.ToString()
@@ -118,6 +120,16 @@ public class OrderService : IOrderService
         await _auditLogs.AddAsync(auditLog, ct);
 
         await _orders.SaveChangesAsync(ct);
+
+        if (order.RestaurantTableId.HasValue)
+        {
+            await _floors.UpdateTableStatusAsync(order.RestaurantTableId.Value, TableStatus.Occupied);
+            await _floors.SaveChangesAsync();
+            await _hub.SendToGroupAsync("manager", "TableStatusChanged",
+                new { tableId = order.RestaurantTableId.Value, status = TableStatus.Occupied.ToString() }, ct);
+            await _hub.SendToGroupAsync("kitchen", "TableStatusChanged",
+                new { tableId = order.RestaurantTableId.Value, status = TableStatus.Occupied.ToString() }, ct);
+        }
 
         var dto = ToDto(order);
         await _hub.SendToGroupAsync("kitchen", "OrderPlaced", new { order = dto }, ct);
@@ -229,6 +241,17 @@ public class OrderService : IOrderService
 
         await _orders.SaveChangesAsync(ct);
 
+        if (order.RestaurantTableId.HasValue &&
+            (request.Status == OrderStatus.Paid || request.Status == OrderStatus.Closed))
+        {
+            await _floors.UpdateTableStatusAsync(order.RestaurantTableId.Value, TableStatus.Available);
+            await _floors.SaveChangesAsync();
+            await _hub.SendToGroupAsync("manager", "TableStatusChanged",
+                new { tableId = order.RestaurantTableId.Value, status = TableStatus.Available.ToString() }, ct);
+            await _hub.SendToGroupAsync("kitchen", "TableStatusChanged",
+                new { tableId = order.RestaurantTableId.Value, status = TableStatus.Available.ToString() }, ct);
+        }
+
         var dto = ToDto(order);
 
         var payload = new
@@ -296,7 +319,6 @@ public class OrderService : IOrderService
         o.OrderNumber,
         o.Status,
         o.Channel,
-        o.TableId,
         o.RestaurantTableId,
         o.CustomerName,
         o.Notes,

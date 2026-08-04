@@ -23,6 +23,6 @@ public class CreateOrderRequestValidator : AbstractValidator<CreateOrderRequest>
         RuleFor(x => x.Items).NotEmpty().WithMessage("At least one item is required.");
         RuleForEach(x => x.Items).SetValidator(new CreateOrderItemRequestValidator());
         When(x => x.Channel == OrderChannel.DineIn, () =>
-            RuleFor(x => x.TableId).NotNull().NotEmpty().WithMessage("TableId is required for DineIn orders."));
+            RuleFor(x => x.RestaurantTableId).NotNull().NotEmpty().WithMessage("RestaurantTableId is required for DineIn orders."));
     }
 }

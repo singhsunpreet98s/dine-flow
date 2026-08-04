@@ -1,4 +1,5 @@
 using DineFlow.Domain.Entities;
+using DineFlow.Domain.Enums;
 using DineFlow.Domain.Interfaces;
 using DineFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,13 @@ public class FloorRepository : IFloorRepository
     // When Orders are linked to RestaurantTable, update this query to check active order status.
     public Task<bool> HasActiveOrdersOnFloorAsync(Guid floorId)
         => Task.FromResult(false);
+
+    public async Task UpdateTableStatusAsync(Guid tableId, TableStatus status)
+    {
+        var table = await _db.RestaurantTables.FindAsync(tableId);
+        if (table is not null)
+            table.Status = status;
+    }
 
     public Task SaveChangesAsync()
         => _db.SaveChangesAsync();

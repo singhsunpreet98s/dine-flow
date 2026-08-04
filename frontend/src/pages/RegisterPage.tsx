@@ -1,37 +1,35 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { UtensilsCrossed } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
 import { useAppDispatch } from '@/app/hooks'
 import { setCredentials } from '@/features/auth/authSlice'
 import { useRegisterMutation } from '@/features/auth/authApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FormField } from '@/components/shared/FormField'
+import { registerSchema, type RegisterFormValues } from '@/features/auth/authSchemas'
 
 export function RegisterPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const [register, { isLoading }] = useRegisterMutation()
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' })
-  const [error, setError] = useState('')
   const [adminExists, setAdminExists] = useState(false)
 
-  function update(field: keyof typeof form, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
+  const {
+    register: rhfRegister,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<RegisterFormValues>({ resolver: yupResolver(registerSchema) })
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.')
-      return
-    }
+  async function handleRegister(values: RegisterFormValues) {
     try {
       const result = await register({
-        name: form.name,
-        email: form.email,
-        password: form.password,
+        name: values.name,
+        email: values.email,
+        password: values.password,
       }).unwrap()
       dispatch(
         setCredentials({
@@ -48,7 +46,9 @@ export function RegisterPage() {
       if (apiError?.status === 409) {
         setAdminExists(true)
       } else {
-        setError(apiError?.data?.message ?? 'Registration failed. Please try again.')
+        setError('root', {
+          message: apiError?.data?.message ?? 'Registration failed. Please try again.',
+        })
       }
     }
   }
@@ -87,54 +87,46 @@ export function RegisterPage() {
             <p className="mt-0.5 text-sm text-muted-foreground">Create your admin account</p>
           </div>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="name">Full Name</Label>
-            <Input
-              id="name"
-              value={form.name}
-              onChange={(e) => update('name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={form.email}
-              onChange={(e) => update('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="password">Password</Label>
+
+        <form onSubmit={handleSubmit(handleRegister)} className="space-y-4">
+          <FormField label="Full Name" htmlFor="name" error={errors.name?.message} required>
+            <Input id="name" {...rhfRegister('name')} />
+          </FormField>
+
+          <FormField label="Email" htmlFor="email" error={errors.email?.message} required>
+            <Input id="email" type="email" autoComplete="email" {...rhfRegister('email')} />
+          </FormField>
+
+          <FormField label="Password" htmlFor="password" error={errors.password?.message} required>
             <Input
               id="password"
               type="password"
               autoComplete="new-password"
-              value={form.password}
-              onChange={(e) => update('password', e.target.value)}
-              required
+              {...rhfRegister('password')}
             />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+          </FormField>
+
+          <FormField
+            label="Confirm Password"
+            htmlFor="confirmPassword"
+            error={errors.confirmPassword?.message}
+            required
+          >
             <Input
               id="confirmPassword"
               type="password"
               autoComplete="new-password"
-              value={form.confirmPassword}
-              onChange={(e) => update('confirmPassword', e.target.value)}
-              required
+              {...rhfRegister('confirmPassword')}
             />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          </FormField>
+
+          {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? 'Creating account…' : 'Create Account'}
           </Button>
         </form>
+
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Already have an account?{' '}
           <Link to="/login" className="text-primary underline-offset-4 hover:underline">

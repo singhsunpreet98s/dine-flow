@@ -32,9 +32,9 @@ public class OrderRepository : IOrderRepository
             .Where(o => o.Status == status)
             .ToListAsync(ct);
 
-    public Task<bool> HasActiveOrderForTableAsync(Guid tableId, CancellationToken ct = default)
+    public Task<bool> HasActiveOrderForRestaurantTableAsync(Guid restaurantTableId, CancellationToken ct = default)
         => _db.Orders.AnyAsync(
-            o => o.TableId == tableId &&
+            o => o.RestaurantTableId == restaurantTableId &&
                  o.Status != OrderStatus.Paid &&
                  o.Status != OrderStatus.Closed,
             ct);

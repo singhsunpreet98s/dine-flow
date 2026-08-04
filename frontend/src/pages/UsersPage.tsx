@@ -1,24 +1,14 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { useCreateSubUserMutation, useGetUsersQuery } from '@/features/auth/authApi'
-import type { AppUserDto, CreateSubUserRequest } from '@/types/api'
+import { useGetUsersQuery } from '@/features/auth/authApi'
+import type { AppUserDto } from '@/types/api'
 import { UserRole } from '@/types/enums'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
@@ -30,15 +20,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-
-const SUB_ROLES = [UserRole.Manager, UserRole.Waiter, UserRole.Kitchen] as const
-
-const EMPTY_FORM: CreateSubUserRequest = {
-  name: '',
-  email: '',
-  password: '',
-  role: UserRole.Waiter,
-}
+import { CreateUserForm } from '@/features/admin/components/CreateUserForm'
 
 const ROLE_BADGE: Record<UserRole, string> = {
   [UserRole.Admin]:   'purple',
@@ -104,38 +86,7 @@ const COLUMNS: ColumnDef<AppUserDto>[] = [
 
 export function UsersPage() {
   const { data: users = [], isLoading, isError } = useGetUsersQuery()
-  const [createSubUser, { isLoading: isCreating }] = useCreateSubUserMutation()
-
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [form, setForm] = useState<CreateSubUserRequest>(EMPTY_FORM)
-  const [formError, setFormError] = useState('')
-
-  function handleSheetChange(open: boolean) {
-    setSheetOpen(open)
-    if (!open) {
-      setForm(EMPTY_FORM)
-      setFormError('')
-    }
-  }
-
-  function updateField<K extends keyof CreateSubUserRequest>(
-    field: K,
-    value: CreateSubUserRequest[K],
-  ) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  async function handleCreateUser(e: React.FormEvent) {
-    e.preventDefault()
-    setFormError('')
-    try {
-      await createSubUser(form).unwrap()
-      handleSheetChange(false)
-    } catch (err: unknown) {
-      const apiError = err as { data?: { message?: string } }
-      setFormError(apiError?.data?.message ?? 'Failed to create user.')
-    }
-  }
 
   return (
     <div className="p-6">
@@ -159,7 +110,6 @@ export function UsersPage() {
         </TooltipProvider>
       </div>
 
-      {/* Users table */}
       <DataTable
         columns={COLUMNS}
         rows={users}
@@ -171,7 +121,7 @@ export function UsersPage() {
       />
 
       {/* Add user sheet */}
-      <Sheet open={sheetOpen} onOpenChange={handleSheetChange}>
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Add Team Member</SheetTitle>
@@ -179,89 +129,9 @@ export function UsersPage() {
               Create a new staff account. The user can sign in immediately after creation.
             </SheetDescription>
           </SheetHeader>
-
-          <form onSubmit={handleCreateUser} className="flex flex-1 flex-col overflow-y-auto">
-            <div className="flex-1 space-y-5 px-6 py-6">
-              <div className="space-y-1.5">
-                <Label htmlFor="sf-name">Full Name</Label>
-                <Input
-                  id="sf-name"
-                  placeholder="e.g. Riya Sharma"
-                  value={form.name}
-                  onChange={(e) => updateField('name', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="sf-email">Email</Label>
-                <Input
-                  id="sf-email"
-                  type="email"
-                  placeholder="staff@restaurant.com"
-                  value={form.email}
-                  onChange={(e) => updateField('email', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="sf-password">Password</Label>
-                <Input
-                  id="sf-password"
-                  type="password"
-                  placeholder="Minimum 8 characters"
-                  value={form.password}
-                  onChange={(e) => updateField('password', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="sf-role">Role</Label>
-                <Select
-                  value={form.role}
-                  onValueChange={(v) => updateField('role', v as UserRole)}
-                >
-                  <SelectTrigger id="sf-role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUB_ROLES.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {form.role === UserRole.Kitchen && 'Kitchen staff see the live order queue only.'}
-                  {form.role === UserRole.Waiter && 'Waiters manage floor tables and take orders.'}
-                  {form.role === UserRole.Manager && 'Managers can view reports and manage orders.'}
-                </p>
-              </div>
-
-              {formError && (
-                <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {formError}
-                </p>
-              )}
-            </div>
-
-            <SheetFooter>
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => handleSheetChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={isCreating}>
-                {isCreating ? 'Creating…' : 'Create User'}
-              </Button>
-            </SheetFooter>
-          </form>
+          <div className="px-6 py-6">
+            <CreateUserForm onSuccess={() => setSheetOpen(false)} submitLabel="Create User" />
+          </div>
         </SheetContent>
       </Sheet>
     </div>

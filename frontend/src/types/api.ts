@@ -46,7 +46,7 @@ export interface CreateOrderRequest {
   customerName?: string
   channel: OrderChannel
   memberCount: number
-  tableId?: string
+  restaurantTableId?: string
   items: CreateOrderItemRequest[]
 }
 
@@ -59,7 +59,7 @@ export interface OrderDto {
   orderNumber: string
   status: OrderStatus
   channel: OrderChannel
-  tableId: string | null
+  restaurantTableId: string | null
   customerName: string | null
   notes: string | null
   memberCount: number

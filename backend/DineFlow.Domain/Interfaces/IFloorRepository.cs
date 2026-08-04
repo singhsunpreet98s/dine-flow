@@ -1,4 +1,5 @@
 using DineFlow.Domain.Entities;
+using DineFlow.Domain.Enums;
 
 namespace DineFlow.Domain.Interfaces;
 
@@ -11,5 +12,6 @@ public interface IFloorRepository
     Task<RestaurantTable?> GetTableByIdAsync(Guid id);
     Task AddTableAsync(RestaurantTable table);
     Task<bool> HasActiveOrdersOnFloorAsync(Guid floorId);
+    Task UpdateTableStatusAsync(Guid tableId, TableStatus status);
     Task SaveChangesAsync();
 }

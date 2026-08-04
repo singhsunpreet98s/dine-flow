@@ -1,34 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setCredentials } from '@/features/auth/authSlice'
 import { useSetRestaurantNameMutation } from '@/features/auth/authApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FormField } from '@/components/shared/FormField'
+import { restaurantSetupSchema, type RestaurantSetupFormValues } from '@/features/auth/authSchemas'
 
 export function RestaurantSetupPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const isSetupComplete = useAppSelector((s) => s.auth.isSetupComplete)
   const [setName, { isLoading }] = useSetRestaurantNameMutation()
-  const [restaurantName, setRestaurantName] = useState('')
-  const [error, setError] = useState('')
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<RestaurantSetupFormValues>({ resolver: yupResolver(restaurantSetupSchema) })
 
   useEffect(() => {
     if (isSetupComplete) navigate('/admin', { replace: true })
   }, [isSetupComplete, navigate])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
+  async function handleSetup(values: RestaurantSetupFormValues) {
     try {
-      await setName({ name: restaurantName }).unwrap()
+      await setName({ name: values.restaurantName }).unwrap()
       dispatch(setCredentials({ isSetupComplete: true }))
       navigate('/admin', { replace: true })
     } catch (err: unknown) {
       const apiError = err as { data?: { message?: string } }
-      setError(apiError?.data?.message ?? 'Failed to save restaurant name.')
+      setError('root', { message: apiError?.data?.message ?? 'Failed to save restaurant name.' })
     }
   }
 
@@ -36,19 +42,24 @@ export function RestaurantSetupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-sm rounded-lg border bg-card p-8 shadow-sm">
         <h1 className="mb-2 text-2xl font-bold">Welcome to DineFlow</h1>
-        <p className="mb-6 text-sm text-muted-foreground">What's your restaurant called?</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="restaurantName">Restaurant Name</Label>
+        <p className="mb-6 text-sm text-muted-foreground">What&apos;s your restaurant called?</p>
+
+        <form onSubmit={handleSubmit(handleSetup)} className="space-y-4">
+          <FormField
+            label="Restaurant Name"
+            htmlFor="restaurantName"
+            error={errors.restaurantName?.message}
+            required
+          >
             <Input
               id="restaurantName"
-              value={restaurantName}
-              onChange={(e) => setRestaurantName(e.target.value)}
               placeholder="e.g. The Golden Fork"
-              required
+              {...register('restaurantName')}
             />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          </FormField>
+
+          {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? 'Saving…' : 'Continue'}
           </Button>

@@ -11,6 +11,5 @@ public record CreateOrderRequest(
     string? CustomerName,
     OrderChannel Channel,
     int MemberCount,
-    Guid? TableId,
     IReadOnlyList<CreateOrderItemRequest> Items,
     Guid? RestaurantTableId = null);

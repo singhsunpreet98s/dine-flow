@@ -7,7 +7,6 @@ public record OrderDto(
     string OrderNumber,
     OrderStatus Status,
     OrderChannel Channel,
-    Guid? TableId,
     Guid? RestaurantTableId,
     string? CustomerName,
     string? Notes,

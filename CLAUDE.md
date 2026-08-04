@@ -137,6 +137,17 @@ Channel is a display property only — all channels share the same order lifecyc
 - No `any` type — use `unknown` + type guards at API boundaries
 - Enums defined in `src/types/`: `OrderStatus`, `OrderChannel`, `TableStatus`, `PaymentMode`, `UserRole`
 
+## Forms
+
+- **react-hook-form** + **yup** + **@hookform/resolvers** for all forms — no raw `useState` for field values
+- Yup schemas colocated in `src/features/<feature>/schemas.ts` (e.g. `authSchemas.ts`, `menuSchemas.ts`)
+- Shared reusable form wrapper: `src/components/shared/FormField.tsx` — Label + children + error message
+- Shared toggle: `src/components/shared/ToggleSwitch.tsx`
+- Shadcn `Input` supports `{...register('field')}` spread directly; Shadcn `Select` requires `<Controller>`
+- API errors written to `setError('root', { message })` — rendered as `{errors.root?.message}`
+- Shared form component `src/features/admin/components/CreateUserForm.tsx` used by AdminPage and UsersPage
+- Dynamic non-input state (item pickers, file uploads) stays as `useState` alongside the RHF form
+
 ## Testing Strategy
 
 - **xUnit**: pure unit tests for domain logic; integration tests hit a real test SQL Server (no mocked EF)

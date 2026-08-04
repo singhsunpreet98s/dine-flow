@@ -117,7 +117,7 @@ function OrderDetailDialog({ table, onClose, timeZoneId }: OrderDetailDialogProp
           </div>
           <div>
             <span className="font-medium">Status:</span>{' '}
-            <span className="inline-block px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs font-semibold">
+            <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
               {order.status}
             </span>
           </div>
@@ -167,7 +167,7 @@ function OrderDetailDialog({ table, onClose, timeZoneId }: OrderDetailDialogProp
 function FloorLegend() {
   const items: Array<{ label: string; cls: string }> = [
     { label: 'Available', cls: 'bg-gray-100 border border-gray-300 dark:bg-gray-800 dark:border-gray-600' },
-    { label: 'Occupied',  cls: 'bg-indigo-600 dark:bg-indigo-700' },
+    { label: 'Occupied',  cls: 'bg-primary' },
     { label: 'Reserved',  cls: 'bg-amber-100 border border-amber-400 dark:bg-amber-900 dark:border-amber-600' },
     { label: 'Cleaning',  cls: 'bg-blue-100 border border-blue-400 dark:bg-blue-900 dark:border-blue-600' },
     { label: 'Inactive',  cls: 'bg-gray-50 border border-gray-200 dark:bg-gray-900 dark:border-gray-700 opacity-60' },
@@ -390,7 +390,7 @@ export function TablesPage() {
             onClick={() => setActiveFloorIndex(idx)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
               idx === safeIndex
-                ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+                ? 'bg-primary text-primary-foreground'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
             }`}
           >

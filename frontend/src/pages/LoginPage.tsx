@@ -1,13 +1,15 @@
-import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { UtensilsCrossed } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
 import { useAppDispatch } from '@/app/hooks'
 import { setCredentials } from '@/features/auth/authSlice'
 import { useLoginMutation } from '@/features/auth/authApi'
 import { UserRole } from '@/types/enums'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FormField } from '@/components/shared/FormField'
+import { loginSchema, type LoginFormValues } from '@/features/auth/authSchemas'
 
 function getPostLoginPath(role: UserRole, isSetupComplete: boolean): string {
   if (role === UserRole.Admin && !isSetupComplete) return '/setup'
@@ -20,15 +22,17 @@ export function LoginPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const [login, { isLoading }] = useLoginMutation()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<LoginFormValues>({ resolver: yupResolver(loginSchema) })
+
+  async function handleLogin(values: LoginFormValues) {
     try {
-      const result = await login({ email, password }).unwrap()
+      const result = await login(values).unwrap()
       dispatch(
         setCredentials({
           userId: result.userId,
@@ -41,7 +45,7 @@ export function LoginPage() {
       navigate(getPostLoginPath(result.role, result.isSetupComplete), { replace: true })
     } catch (err: unknown) {
       const apiError = err as { data?: { message?: string }; status?: number }
-      setError(apiError?.data?.message ?? 'Login failed. Please try again.')
+      setError('root', { message: apiError?.data?.message ?? 'Login failed. Please try again.' })
     }
   }
 
@@ -58,34 +62,28 @@ export function LoginPage() {
             <p className="mt-0.5 text-sm text-muted-foreground">Sign in to your account</p>
           </div>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="password">Password</Label>
+
+        <form onSubmit={handleSubmit(handleLogin)} className="space-y-4">
+          <FormField label="Email" htmlFor="email" error={errors.email?.message}>
+            <Input id="email" type="email" autoComplete="email" {...register('email')} />
+          </FormField>
+
+          <FormField label="Password" htmlFor="password" error={errors.password?.message}>
             <Input
               id="password"
               type="password"
               autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+              {...register('password')}
             />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          </FormField>
+
+          {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
+
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
+
         <p className="mt-4 text-center text-sm text-muted-foreground">
           First time?{' '}
           <Link to="/register" className="text-primary underline-offset-4 hover:underline">

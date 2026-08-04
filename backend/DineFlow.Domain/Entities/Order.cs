@@ -21,7 +21,6 @@ public class Order : BaseEntity
     public string OrderNumber { get; set; } = string.Empty;
     public OrderStatus Status { get; private set; } = OrderStatus.Placed;
     public OrderChannel Channel { get; set; }
-    public Guid? TableId { get; set; }
     public Guid? RestaurantTableId { get; set; }
     public RestaurantTable? RestaurantTable { get; set; }
     public string? CustomerName { get; set; }
