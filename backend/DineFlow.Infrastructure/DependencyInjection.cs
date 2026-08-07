@@ -1,3 +1,4 @@
+using DineFlow.Application.Services;
 using DineFlow.Domain.Interfaces;
 using DineFlow.Infrastructure.Persistence;
 using DineFlow.Infrastructure.Persistence.Interceptors;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IRestaurantSettingsRepository, RestaurantSettingsRepository>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
+        services.AddScoped<IDashboardService, DashboardService>();
 
         return services;
     }

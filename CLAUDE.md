@@ -170,6 +170,48 @@ Rules:
 - **Jest**: reducer unit tests; RTL for critical UI flows; mock SignalR via `jest.mock('@microsoft/signalr')`
 - **Playwright**: happy-path E2E per role, key exception flows (out-of-stock, cancel, offline sync)
 
+## Test Requirements (Non-Negotiable)
+
+**Every new feature, endpoint, or component must ship with tests.** Tests are not optional and must be created in the same PR as the feature code.
+
+### Backend — xUnit
+
+| Change | Required test | Location |
+|--------|--------------|----------|
+| New service method | Unit test using EF Core InMemory DB | `DineFlow.Tests/Services/<Feature>Tests.cs` |
+| New domain behavior | Pure unit test | `DineFlow.Tests/Domain/<Entity>Tests.cs` |
+| New controller endpoint | Integration test via `WebApplicationFactory` | `DineFlow.Tests/Controllers/<Name>Tests.cs` |
+
+**Service test pattern** — use EF Core InMemory (never mock `DbContext`):
+```csharp
+var options = new DbContextOptionsBuilder<DineFlowDbContext>()
+    .UseInMemoryDatabase(Guid.NewGuid().ToString()) // isolated per test
+    .Options;
+var context = new DineFlowDbContext(options);
+var sut = new XxxService(context);
+```
+
+Naming convention: `MethodName_WhenCondition_ExpectedResult`
+
+Use `_context.Entry(entity).Property("PropName").CurrentValue = value` to bypass private setters when seeding test data.
+
+### Frontend — Jest + RTL
+
+| Change | Required test | Location |
+|--------|--------------|----------|
+| New Redux slice | Reducer unit test | `src/__tests__/features/<feature>/<slice>.test.ts` |
+| New RTK Query endpoint | Endpoint + fetch mock test | `src/__tests__/features/<feature>/<api>.test.ts` |
+| New component | RTL rendering test | `src/__tests__/features/<feature>/<Component>.test.tsx` |
+| New custom hook | `renderHook` test | `src/__tests__/hooks/<hook>.test.ts` |
+
+**Component test rules:**
+- Import `@testing-library/jest-dom` at the top of every `.test.tsx` file
+- Mock Recharts in all chart tests: `jest.mock('recharts', () => ({ ResponsiveContainer: ..., BarChart: ..., ... }))`
+- Mock SignalR in files that touch the hub: `jest.mock('@microsoft/signalr')`
+- Assert on visible text, roles, and aria attributes — never on CSS class names
+- No `any` types in test files — use `unknown` + type assertions where needed
+- **RTK Query tests** — JSDOM lacks `Request`; add `node-fetch` polyfill at top of file, use isolated API with `fetchFn` injection, assert via selector (see `frontend.md` agent for complete pattern)
+
 ## Custom Agents (Invoke via Agent tool)
 
 | Agent | When to use |
