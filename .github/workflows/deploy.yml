@@ -179,7 +179,8 @@ jobs:
     needs: [build-backend, migrate-database]
     permissions:
       contents: read
-      id-token: write  # required by azure/login@v2 even for SERVICE_PRINCIPAL + client-secret auth
+      # No id-token permission — we use az login --service-principal (client secret)
+      # so GitHub's OIDC endpoint is never contacted and azure/login@v2 is bypassed.
     environment:
       name: production
       url: ${{ env.VITE_API_URL_VALUE }}
@@ -204,34 +205,38 @@ jobs:
           TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
           SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          auth-type:       SERVICE_PRINCIPAL
-          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
-          client-secret:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Azure Login (service principal + client secret)
+        # Use az CLI directly — azure/login@v2 prefers OIDC when id-token is
+        # available and falls back to OIDC even with auth-type: SERVICE_PRINCIPAL,
+        # which fails unless federated identity credentials are configured in
+        # Azure AD (AADSTS70025). az login --service-principal never touches OIDC.
+        run: |
+          az login --service-principal \
+            --username "${{ secrets.AZURE_CLIENT_ID }}" \
+            --password "${{ secrets.AZURE_CLIENT_SECRET }}" \
+            --tenant  "${{ secrets.AZURE_TENANT_ID }}"
+          az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
 
       - name: Configure App Service settings
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            az webapp config appsettings set \
-              --resource-group ${{ env.RESOURCE_GROUP }} \
-              --name ${{ env.BACKEND_APP_NAME }} \
-              --settings \
-                ASPNETCORE_ENVIRONMENT="Production" \
-                Jwt__Issuer="DineFlow" \
-                Jwt__Audience="DineFlow" \
-                Jwt__ExpiryMinutes="480" \
-                Jwt__Secret="${{ env.JWT_SECRET_VALUE }}" \
-                ConnectionStrings__DefaultConnection="${{ env.SQL_CONNECTION_STRING }}" \
-                AzureStorage__ConnectionString="${{ env.STORAGE_CONNECTION_STRING }}" \
-                AllowedOrigins__Frontend="https://$(az staticwebapp show \
-                  --resource-group ${{ env.RESOURCE_GROUP }} \
-                  --name ${{ env.STATIC_WEB_APP_NAME }} \
-                  --query defaultHostname -o tsv 2>/dev/null || echo 'placeholder.azurestaticapps.net')"
+        run: |
+          FRONTEND_HOSTNAME=$(az staticwebapp show \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.STATIC_WEB_APP_NAME }} \
+            --query defaultHostname -o tsv 2>/dev/null \
+            || echo 'placeholder.azurestaticapps.net')
+
+          az webapp config appsettings set \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --settings \
+              ASPNETCORE_ENVIRONMENT="Production" \
+              Jwt__Issuer="DineFlow" \
+              Jwt__Audience="DineFlow" \
+              Jwt__ExpiryMinutes="480" \
+              "Jwt__Secret=${{ env.JWT_SECRET_VALUE }}" \
+              "ConnectionStrings__DefaultConnection=${{ env.SQL_CONNECTION_STRING }}" \
+              "AzureStorage__ConnectionString=${{ env.STORAGE_CONNECTION_STRING }}" \
+              "AllowedOrigins__Frontend=https://${FRONTEND_HOSTNAME}"
 
       - name: Download backend artifact
         uses: actions/download-artifact@v4
