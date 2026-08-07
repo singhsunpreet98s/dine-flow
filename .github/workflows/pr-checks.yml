@@ -1,0 +1,89 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: write # allows publishing test results as PR annotations
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '22.x'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Backend: restore → build → test
+  # ─────────────────────────────────────────────────────────────────────────────
+  backend-checks:
+    name: Backend — Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore backend/DineFlow.sln
+
+      - name: Build
+        run: dotnet build backend/DineFlow.sln --no-restore --configuration Release
+
+      - name: Test
+        run: |
+          dotnet test backend/DineFlow.sln \
+            --no-build \
+            --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory ./test-results
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: .NET Tests
+          path: test-results/*.trx
+          reporter: dotnet-trx
+          fail-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Frontend: install → typecheck → build → test
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend-checks:
+    name: Frontend — Build, Typecheck & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: frontend
+        env:
+          # Stub values — PRs verify the build succeeds, not that URLs point anywhere real
+          VITE_API_URL: https://stub.azurewebsites.net
+          VITE_SIGNALR_URL: https://stub.azurewebsites.net/hubs/orders
+        run: npm run build
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test -- --ci --passWithNoTests

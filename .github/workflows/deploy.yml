@@ -1,0 +1,237 @@
+name: Deploy DineFlow to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Placeholder values — replace with real values via GitHub repository secrets
+# (Settings → Secrets and variables → Actions) before your first real deploy.
+#
+# Required secrets to set:
+#   AZURE_CREDENTIALS              — service principal JSON from az ad sp create-for-rbac
+#   AZURE_SQL_CONNECTION_STRING    — Azure SQL connection string
+#   AZURE_STORAGE_CONNECTION_STRING — Blob storage connection string
+#   JWT_SECRET                     — random 48-char secret (openssl rand -base64 48)
+#   VITE_API_URL                   — https://<your-backend-app>.azurewebsites.net
+#   VITE_SIGNALR_URL               — https://<your-backend-app>.azurewebsites.net/hubs/orders
+#   AZURE_STATIC_WEB_APPS_API_TOKEN — from: az staticwebapp secrets list ...
+# ─────────────────────────────────────────────────────────────────────────────
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '22.x'
+  RESOURCE_GROUP: 'dineflow-rg'
+  BACKEND_APP_NAME: 'dineflow-api'
+  STATIC_WEB_APP_NAME: 'dineflow-frontend'
+
+  # Credentials — falls back to placeholder if secret not yet configured
+  SQL_CONNECTION_STRING: ${{ secrets.AZURE_SQL_CONNECTION_STRING || 'Server=tcp:dineflow-sql-prod.database.windows.net,1433;Database=DineFlowDb;User ID=dineflowadmin;Password=CHANGEME;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;' }}
+  STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING || 'DefaultEndpointsProtocol=https;AccountName=dineflowstorageprod;AccountKey=CHANGEME;EndpointSuffix=core.windows.net' }}
+  JWT_SECRET_VALUE: ${{ secrets.JWT_SECRET || 'placeholder-change-me-must-be-at-least-32-chars!' }}
+  VITE_API_URL_VALUE: ${{ secrets.VITE_API_URL || 'https://dineflow-api.azurewebsites.net' }}
+  VITE_SIGNALR_URL_VALUE: ${{ secrets.VITE_SIGNALR_URL || 'https://dineflow-api.azurewebsites.net/hubs/orders' }}
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1: Build and Test Backend
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build & Test Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore backend/DineFlow.sln
+
+      - name: Build
+        run: dotnet build backend/DineFlow.sln --no-restore --configuration Release
+
+      - name: Run tests
+        run: |
+          dotnet test backend/DineFlow.sln \
+            --no-build \
+            --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory ./test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: test-results/
+
+      - name: Publish backend
+        run: |
+          dotnet publish backend/DineFlow.API/DineFlow.API.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./backend-publish
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-publish
+          path: ./backend-publish
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 2: Build Frontend
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ env.VITE_API_URL_VALUE }}
+          VITE_SIGNALR_URL: ${{ env.VITE_SIGNALR_URL_VALUE }}
+        run: npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 3: Run EF Core Migrations
+  # ─────────────────────────────────────────────────────────────────────────────
+  migrate-database:
+    name: Run EF Core Migrations
+    runs-on: ubuntu-latest
+    needs: [build-backend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dotnet-ef tool
+        run: dotnet tool install --global dotnet-ef
+
+      - name: Restore dependencies
+        run: dotnet restore backend/DineFlow.sln
+
+      - name: Run migrations
+        env:
+          ConnectionStrings__DefaultConnection: ${{ env.SQL_CONNECTION_STRING }}
+        run: |
+          dotnet ef database update \
+            --project backend/DineFlow.Infrastructure/DineFlow.Infrastructure.csproj \
+            --startup-project backend/DineFlow.API/DineFlow.API.csproj \
+            --configuration Release
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 4: Deploy Backend to Azure App Service
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: [build-backend, migrate-database]
+    environment:
+      name: production
+      url: ${{ env.VITE_API_URL_VALUE }}
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Configure App Service settings
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az webapp config appsettings set \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --name ${{ env.BACKEND_APP_NAME }} \
+              --settings \
+                ASPNETCORE_ENVIRONMENT="Production" \
+                Jwt__Issuer="DineFlow" \
+                Jwt__Audience="DineFlow" \
+                Jwt__ExpiryMinutes="480" \
+                Jwt__Secret="${{ env.JWT_SECRET_VALUE }}" \
+                ConnectionStrings__DefaultConnection="${{ env.SQL_CONNECTION_STRING }}" \
+                AzureStorage__ConnectionString="${{ env.STORAGE_CONNECTION_STRING }}" \
+                AllowedOrigins__Frontend="https://$(az staticwebapp show \
+                  --resource-group ${{ env.RESOURCE_GROUP }} \
+                  --name ${{ env.STATIC_WEB_APP_NAME }} \
+                  --query defaultHostname -o tsv 2>/dev/null || echo 'placeholder.azurestaticapps.net')"
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-publish
+          path: ./backend-publish
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.BACKEND_APP_NAME }}
+          package: ./backend-publish
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 5: Deploy Frontend to Azure Static Web Apps
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [build-frontend]
+    environment:
+      name: production-frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: 'frontend'
+          output_location: 'dist'
+          skip_app_build: true

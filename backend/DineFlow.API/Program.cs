@@ -11,8 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
 {
+    // Read comma-separated origins from config; fall back to localhost for dev.
+    // In production, AllowedOrigins:Frontend is set via Azure App Service Application Settings.
+    var rawOrigins = builder.Configuration["AllowedOrigins:Frontend"] ?? "http://localhost:5173";
+    var origins = rawOrigins.Split(',',
+        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     options.AddPolicy("Frontend", policy =>
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins(origins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
