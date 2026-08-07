@@ -5,6 +5,7 @@ import {
   type HTMLAttributes,
 } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { cva, type VariantProps } from 'class-variance-authority'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,22 +32,50 @@ const SheetOverlay = forwardRef<
 ))
 SheetOverlay.displayName = 'SheetOverlay'
 
+const sheetVariants = cva(
+  [
+    'fixed z-50 flex flex-col bg-background shadow-xl',
+    'data-[state=open]:animate-in data-[state=closed]:animate-out',
+    'data-[state=open]:duration-300 data-[state=closed]:duration-200',
+  ].join(' '),
+  {
+    variants: {
+      side: {
+        right: [
+          'inset-y-0 right-0 h-full w-full border-l sm:max-w-md',
+          'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
+        ].join(' '),
+        left: [
+          'inset-y-0 left-0 h-full w-full border-r sm:max-w-md',
+          'data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
+        ].join(' '),
+        top: [
+          'inset-x-0 top-0 w-full border-b',
+          'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
+        ].join(' '),
+        bottom: [
+          'inset-x-0 bottom-0 w-full border-t',
+          'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
+        ].join(' '),
+      },
+    },
+    defaultVariants: { side: 'right' },
+  },
+)
+
+interface SheetContentProps
+  extends ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
+    VariantProps<typeof sheetVariants> {}
+
 export const SheetContent = forwardRef<
   ElementRef<typeof DialogPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  SheetContentProps
+>(({ side, className, children, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      className={cn(
-        'fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl',
-        'sm:max-w-md',
-        'data-[state=open]:animate-in data-[state=closed]:animate-out',
-        'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
-        'data-[state=open]:duration-300 data-[state=closed]:duration-200',
-        className,
-      )}
+      className={cn(sheetVariants({ side }), className)}
       {...props}
     >
       {children}

@@ -39,7 +39,7 @@ export interface OrderItemDto {
 export interface CreateOrderItemRequest {
   menuItemId: string
   quantity: number
-  customizationNote?: string
+  customizationNote?: string | null
 }
 
 export interface CreateOrderRequest {
