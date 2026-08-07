@@ -1,4 +1,4 @@
-import { baseApi } from '../../app/api'
+import { baseApi } from '@/app/api'
 import type { SettingsDto } from '@/types/api'
 
 export type { SettingsDto }
