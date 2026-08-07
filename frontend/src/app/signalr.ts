@@ -8,7 +8,7 @@ let startPromise: Promise<void> | null = null
 export function getSignalRConnection(): signalR.HubConnection {
   if (!connection) {
     connection = new signalR.HubConnectionBuilder()
-      .withUrl('https://localhost:44385/hubs/orders', {
+      .withUrl(`${import.meta.env.VITE_SIGNALR_URL ?? 'https://localhost:44385/hubs/orders'}`, {
         // SignalR WebSocket transport cannot send Authorization headers;
         // the server reads this token from ?access_token= in the query string.
         accessTokenFactory: () => {
