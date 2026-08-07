@@ -4,6 +4,10 @@
     "exclude": ["/api/*", "/images/*.{png,jpg,gif,svg}", "/css/*", "/js/*"]
   },
   "mimeTypes": {
-    ".json": "text/json"
+    ".js": "application/javascript",
+    ".mjs": "application/javascript",
+    ".css": "text/css",
+    ".wasm": "application/wasm",
+    ".json": "application/json"
   }
 }
