@@ -6,21 +6,33 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Placeholder values — replace with real values via GitHub repository secrets
-# (Settings → Secrets and variables → Actions) before your first real deploy.
+# Required GitHub Secrets (Settings → Secrets and variables → Actions → Secrets):
 #
-# Required secrets to set:
-#   AZURE_CREDENTIALS              — service principal JSON from az ad sp create-for-rbac
-#   AZURE_SQL_CONNECTION_STRING    — Azure SQL connection string
+#   AZURE_CLIENT_ID       — service principal appId
+#   AZURE_CLIENT_SECRET   — service principal password
+#   AZURE_TENANT_ID       — Azure AD tenant ID
+#   AZURE_SUBSCRIPTION_ID — Azure subscription ID
+#
+#   Create the service principal once:
+#     az ad sp create-for-rbac \
+#       --name "dineflow-github-deploy" \
+#       --role contributor \
+#       --scopes /subscriptions/<SUB_ID>/resourceGroups/dineflow-rg \
+#       --query "{clientId:appId, clientSecret:password, tenantId:tenant, subscriptionId:\"<SUB_ID>\"}"
+#   Store the four values as separate secrets — never paste the whole JSON blob.
+#
+#   AZURE_SQL_CONNECTION_STRING     — Azure SQL connection string
 #   AZURE_STORAGE_CONNECTION_STRING — Blob storage connection string
-#   JWT_SECRET                     — random 48-char secret (openssl rand -base64 48)
-#   VITE_API_URL                   — https://<your-backend-app>.azurewebsites.net
-#   VITE_SIGNALR_URL               — https://<your-backend-app>.azurewebsites.net/hubs/orders
-#   AZURE_STATIC_WEB_APPS_API_TOKEN — from: az staticwebapp secrets list ...
+#   JWT_SECRET                      — random 48-char secret (openssl rand -base64 48)
+#   VITE_API_URL                    — https://<your-backend-app>.azurewebsites.net
+#   VITE_SIGNALR_URL                — https://<your-backend-app>.azurewebsites.net/hubs/orders
+#   AZURE_STATIC_WEB_APPS_API_TOKEN — from: az staticwebapp secrets list \
+#                                       --name dineflow-frontend \
+#                                       --resource-group dineflow-rg \
+#                                       --query "properties.apiKey" -o tsv
 # ─────────────────────────────────────────────────────────────────────────────
 
 env:
@@ -170,10 +182,32 @@ jobs:
       url: ${{ env.VITE_API_URL_VALUE }}
 
     steps:
+      - name: Verify Azure credentials are set
+        run: |
+          missing=()
+          [ -z "$CLIENT_ID" ]       && missing+=("AZURE_CLIENT_ID")
+          [ -z "$CLIENT_SECRET" ]   && missing+=("AZURE_CLIENT_SECRET")
+          [ -z "$TENANT_ID" ]       && missing+=("AZURE_TENANT_ID")
+          [ -z "$SUBSCRIPTION_ID" ] && missing+=("AZURE_SUBSCRIPTION_ID")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing secrets: ${missing[*]}"
+            echo "::error::Add them under Settings → Secrets and variables → Actions → Secrets"
+            exit 1
+          fi
+          echo "✓ All Azure credential secrets are present"
+        env:
+          CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
+          CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
+          TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Azure Login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+          client-secret:   ${{ secrets.AZURE_CLIENT_SECRET }}
+          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Configure App Service settings
         uses: azure/CLI@v2
