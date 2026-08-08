@@ -117,6 +117,84 @@ describe('uiSlice', () => {
     expect(stored.accentColor).toBe('rose')
   })
 
+  // ── toggleSidebar — localStorage persistence ───────────────────────────────
+
+  it('toggleSidebar persists sidebarOpen false to localStorage', () => {
+    // Default starts open (true); toggle → false
+    reducer(undefined, toggleSidebar())
+    const stored = JSON.parse(localStorageMock.getItem('dineflow_ui') ?? '{}') as {
+      sidebarOpen: boolean
+    }
+    expect(stored.sidebarOpen).toBe(false)
+  })
+
+  it('toggleSidebar persists sidebarOpen true to localStorage', () => {
+    // Close first, then re-open
+    const closed = reducer(undefined, setSidebarOpen(false))
+    reducer(closed, toggleSidebar())
+    const stored = JSON.parse(localStorageMock.getItem('dineflow_ui') ?? '{}') as {
+      sidebarOpen: boolean
+    }
+    expect(stored.sidebarOpen).toBe(true)
+  })
+
+  // ── setSidebarOpen — localStorage persistence ──────────────────────────────
+
+  it('setSidebarOpen persists sidebarOpen false to localStorage', () => {
+    reducer(undefined, setSidebarOpen(false))
+    const stored = JSON.parse(localStorageMock.getItem('dineflow_ui') ?? '{}') as {
+      sidebarOpen: boolean
+    }
+    expect(stored.sidebarOpen).toBe(false)
+  })
+
+  it('setSidebarOpen persists sidebarOpen true to localStorage', () => {
+    reducer(undefined, setSidebarOpen(true))
+    const stored = JSON.parse(localStorageMock.getItem('dineflow_ui') ?? '{}') as {
+      sidebarOpen: boolean
+    }
+    expect(stored.sidebarOpen).toBe(true)
+  })
+
+  // ── setTheme/setAccentColor do not clobber sidebarOpen ────────────────────
+
+  it('setTheme does not overwrite persisted sidebarOpen', () => {
+    const s = reducer(undefined, setSidebarOpen(false))
+    reducer(s, setTheme('dark'))
+    const stored = JSON.parse(localStorageMock.getItem('dineflow_ui') ?? '{}') as {
+      sidebarOpen: boolean
+      theme: string
+    }
+    expect(stored.sidebarOpen).toBe(false)
+    expect(stored.theme).toBe('dark')
+  })
+
+  it('setAccentColor does not overwrite persisted sidebarOpen', () => {
+    const s = reducer(undefined, setSidebarOpen(false))
+    reducer(s, setAccentColor('rose'))
+    const stored = JSON.parse(localStorageMock.getItem('dineflow_ui') ?? '{}') as {
+      sidebarOpen: boolean
+      accentColor: string
+    }
+    expect(stored.sidebarOpen).toBe(false)
+    expect(stored.accentColor).toBe('rose')
+  })
+
+  // ── hydration from localStorage ────────────────────────────────────────────
+
+  it('initial state reads sidebarOpen false from localStorage', () => {
+    localStorageMock.setItem(
+      'dineflow_ui',
+      JSON.stringify({ sidebarOpen: false, theme: 'light', accentColor: 'blue' }),
+    )
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { uiSlice: freshSlice } = require('@/features/ui/uiSlice') as typeof import('@/features/ui/uiSlice')
+      const state = freshSlice.reducer(undefined, { type: '' })
+      expect(state.sidebarOpen).toBe(false)
+    })
+  })
+
   // ── setActiveOrder ─────────────────────────────────────────────────────────
 
   it('setActiveOrder sets activeOrderId', () => {

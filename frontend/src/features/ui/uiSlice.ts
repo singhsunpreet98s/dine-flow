@@ -23,20 +23,25 @@ interface UiState {
 
 const UI_STORAGE_KEY = 'dineflow_ui'
 
-function loadUiPrefs(): Pick<UiState, 'theme' | 'accentColor'> {
+function loadUiPrefs(): Pick<UiState, 'sidebarOpen' | 'theme' | 'accentColor'> {
   try {
     const raw = localStorage.getItem(UI_STORAGE_KEY)
-    if (!raw) return { theme: 'light', accentColor: 'blue' }
-    return JSON.parse(raw) as Pick<UiState, 'theme' | 'accentColor'>
+    if (!raw) return { sidebarOpen: true, theme: 'light', accentColor: 'blue' }
+    const parsed = JSON.parse(raw) as Partial<Pick<UiState, 'sidebarOpen' | 'theme' | 'accentColor'>>
+    return {
+      sidebarOpen: parsed.sidebarOpen ?? true,
+      theme: parsed.theme ?? 'light',
+      accentColor: parsed.accentColor ?? 'blue',
+    }
   } catch {
-    return { theme: 'light', accentColor: 'blue' }
+    return { sidebarOpen: true, theme: 'light', accentColor: 'blue' }
   }
 }
 
 const prefs = loadUiPrefs()
 
 const initialState: UiState = {
-  sidebarOpen: true,
+  sidebarOpen: prefs.sidebarOpen,
   activeOrderId: null,
   theme: prefs.theme,
   accentColor: prefs.accentColor,
@@ -48,9 +53,17 @@ export const uiSlice = createSlice({
   reducers: {
     toggleSidebar(state) {
       state.sidebarOpen = !state.sidebarOpen
+      localStorage.setItem(
+        UI_STORAGE_KEY,
+        JSON.stringify({ sidebarOpen: state.sidebarOpen, theme: state.theme, accentColor: state.accentColor }),
+      )
     },
     setSidebarOpen(state, action: PayloadAction<boolean>) {
       state.sidebarOpen = action.payload
+      localStorage.setItem(
+        UI_STORAGE_KEY,
+        JSON.stringify({ sidebarOpen: state.sidebarOpen, theme: state.theme, accentColor: state.accentColor }),
+      )
     },
     setActiveOrder(state, action: PayloadAction<string | null>) {
       state.activeOrderId = action.payload
@@ -59,14 +72,14 @@ export const uiSlice = createSlice({
       state.theme = action.payload
       localStorage.setItem(
         UI_STORAGE_KEY,
-        JSON.stringify({ theme: state.theme, accentColor: state.accentColor }),
+        JSON.stringify({ sidebarOpen: state.sidebarOpen, theme: state.theme, accentColor: state.accentColor }),
       )
     },
     setAccentColor(state, action: PayloadAction<AccentColor>) {
       state.accentColor = action.payload
       localStorage.setItem(
         UI_STORAGE_KEY,
-        JSON.stringify({ theme: state.theme, accentColor: state.accentColor }),
+        JSON.stringify({ sidebarOpen: state.sidebarOpen, theme: state.theme, accentColor: state.accentColor }),
       )
     },
   },
