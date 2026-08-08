@@ -220,3 +220,4 @@ Use `_context.Entry(entity).Property("PropName").CurrentValue = value` to bypass
 | `frontend` | React components, Redux, RTK Query, Shadcn, Jest |
 | `code-reviewer` | DineFlow-specific code review with audit trail and real-time checks |
 | `orchestrator` | Any cross-cutting feature (new tile, new page, new alert) — decomposes into backend + frontend tasks and delegates to specialists in parallel |
+| `test-writer` | Write or fill missing tests for existing code — xUnit for backend (services/domain/controllers) and Jest+RTL for frontend (slices/endpoints/components/hooks). Runs automatically after orchestrator tasks; also invoke directly with "add tests for X" |
