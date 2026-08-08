@@ -1,10 +1,14 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using DineFlow.API.Extensions;
 using DineFlow.API.Hubs;
 using DineFlow.Application;
 using DineFlow.Application.Services;
 using DineFlow.Infrastructure;
+using DineFlow.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +38,8 @@ builder.Services.AddSignalR()
 builder.Services.AddScoped<IOrderHubNotifier, OrderHubNotifier>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<DineFlowDbContext>("sql_server");
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -77,6 +83,19 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
+
+// Health check is unauthenticated — map it before the auth middleware.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy]   = StatusCodes.Status200OK,
+        [HealthStatus.Degraded]  = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+    }
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
