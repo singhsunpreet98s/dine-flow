@@ -133,6 +133,8 @@ jobs:
         run: npm run build
 
       - name: Upload frontend artifact
+        # Kept for CI inspection / debugging — deploy-frontend builds from source
+        # independently via the SWA action (Oryx), so it does not consume this artifact.
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
@@ -177,6 +179,10 @@ jobs:
     name: Deploy Backend
     runs-on: ubuntu-latest
     needs: [build-backend, migrate-database]
+    permissions:
+      contents: read
+      # No id-token permission — we use az login --service-principal (client secret)
+      # so GitHub's OIDC endpoint is never contacted and azure/login@v2 is bypassed.
     environment:
       name: production
       url: ${{ env.VITE_API_URL_VALUE }}
@@ -201,34 +207,38 @@ jobs:
           TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
           SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          auth-type:       SERVICE_PRINCIPAL
-          client-id:       ${{ secrets.AZURE_CLIENT_ID }}
-          client-secret:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Azure Login (service principal + client secret)
+        # Use az CLI directly — azure/login@v2 prefers OIDC when id-token is
+        # available and falls back to OIDC even with auth-type: SERVICE_PRINCIPAL,
+        # which fails unless federated identity credentials are configured in
+        # Azure AD (AADSTS70025). az login --service-principal never touches OIDC.
+        run: |
+          az login --service-principal \
+            --username "${{ secrets.AZURE_CLIENT_ID }}" \
+            --password "${{ secrets.AZURE_CLIENT_SECRET }}" \
+            --tenant  "${{ secrets.AZURE_TENANT_ID }}"
+          az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
 
       - name: Configure App Service settings
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            az webapp config appsettings set \
-              --resource-group ${{ env.RESOURCE_GROUP }} \
-              --name ${{ env.BACKEND_APP_NAME }} \
-              --settings \
-                ASPNETCORE_ENVIRONMENT="Production" \
-                Jwt__Issuer="DineFlow" \
-                Jwt__Audience="DineFlow" \
-                Jwt__ExpiryMinutes="480" \
-                Jwt__Secret="${{ env.JWT_SECRET_VALUE }}" \
-                ConnectionStrings__DefaultConnection="${{ env.SQL_CONNECTION_STRING }}" \
-                AzureStorage__ConnectionString="${{ env.STORAGE_CONNECTION_STRING }}" \
-                AllowedOrigins__Frontend="https://$(az staticwebapp show \
-                  --resource-group ${{ env.RESOURCE_GROUP }} \
-                  --name ${{ env.STATIC_WEB_APP_NAME }} \
-                  --query defaultHostname -o tsv 2>/dev/null || echo 'placeholder.azurestaticapps.net')"
+        run: |
+          FRONTEND_HOSTNAME=$(az staticwebapp show \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.STATIC_WEB_APP_NAME }} \
+            --query defaultHostname -o tsv 2>/dev/null \
+            || echo 'placeholder.azurestaticapps.net')
+
+          az webapp config appsettings set \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.BACKEND_APP_NAME }} \
+            --settings \
+              ASPNETCORE_ENVIRONMENT="Production" \
+              Jwt__Issuer="DineFlow" \
+              Jwt__Audience="DineFlow" \
+              Jwt__ExpiryMinutes="480" \
+              "Jwt__Secret=${{ env.JWT_SECRET_VALUE }}" \
+              "ConnectionStrings__DefaultConnection=${{ env.SQL_CONNECTION_STRING }}" \
+              "AzureStorage__ConnectionString=${{ env.STORAGE_CONNECTION_STRING }}" \
+              "AllowedOrigins__Frontend=https://${FRONTEND_HOSTNAME}"
 
       - name: Download backend artifact
         uses: actions/download-artifact@v4
@@ -244,6 +254,13 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Job 5: Deploy Frontend to Azure Static Web Apps
+  #
+  # NOTE: We do NOT use skip_app_build: true here. When skip_app_build is set,
+  # Azure's Oryx builder is bypassed entirely, which means staticwebapp.config.json
+  # (including mimeTypes overrides) is NOT processed — causing JS modules to be
+  # served as application/octet-stream. Letting Oryx build from source ensures
+  # the config is picked up correctly. build-frontend still runs first as a CI
+  # gate (typecheck must pass), but deploy builds from source independently.
   # ─────────────────────────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend
@@ -254,12 +271,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
 
       - name: Verify deployment token is set
         run: |
@@ -274,11 +285,19 @@ jobs:
           TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
 
       - name: Deploy to Azure Static Web Apps
+        # Oryx detects the Vite/React app, runs `npm ci && npm run build`,
+        # processes staticwebapp.config.json (including mimeTypes), then deploys.
+        # VITE_* env vars are forwarded into the Oryx build environment so
+        # Vite embeds them at compile time (import.meta.env.*).
         uses: Azure/static-web-apps-deploy@v1
+        env:
+          VITE_API_URL: ${{ env.VITE_API_URL_VALUE }}
+          VITE_SIGNALR_URL: ${{ env.VITE_SIGNALR_URL_VALUE }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: 'upload'
           app_location: 'frontend'
+          api_location: ''
           output_location: 'dist'
-          skip_app_build: true
+          skip_api_build: true

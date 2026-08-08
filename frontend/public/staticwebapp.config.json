@@ -1,9 +1,18 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/api/*", "/images/*.{png,jpg,gif,svg}", "/css/*", "/js/*"]
+    "exclude": ["/assets/*", "/api/*", "/*.ico", "/*.png", "/*.jpg", "/*.svg", "/*.webp", "/staticwebapp.config.json"]
   },
   "mimeTypes": {
-    ".json": "text/json"
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+    ".cjs": "text/javascript",
+    ".css": "text/css",
+    ".wasm": "application/wasm",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".png": "image/png",
+    ".webp": "image/webp"
   }
 }
