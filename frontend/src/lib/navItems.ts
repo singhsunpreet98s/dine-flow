@@ -20,7 +20,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
   [UserRole.Admin]: [
-    { label: 'Dashboard',  path: '/admin',             icon: LayoutDashboard },
+    { label: 'Dashboard',  path: '/dashboard',             icon: LayoutDashboard },
     { label: 'Orders',     path: '/orders',            icon: ClipboardList   },
     { label: 'Tables',     path: '/tables',            icon: LayoutGrid      },
     { label: 'Floor Plan', path: '/admin/floor-plan',  icon: Map             },

@@ -15,7 +15,6 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { KitchenPage } from '@/pages/KitchenPage'
 import { MenuPage } from '@/pages/MenuPage'
 import { RestaurantSettingsPage } from '@/pages/RestaurantSettingsPage'
-import { AdminPage } from '@/pages/AdminPage'
 import { FloorsPage } from '@/pages/FloorsPage'
 import { FloorEditorPage } from '@/pages/FloorEditorPage'
 import { OrdersPage } from '@/pages/OrdersPage'
@@ -58,14 +57,6 @@ function DashboardRoutes() {
   return (
     <DashboardLayout>
       <Routes>
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={[UserRole.Admin]}>
-              <AdminPage />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/users"
           element={
