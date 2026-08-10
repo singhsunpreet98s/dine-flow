@@ -11,11 +11,11 @@ import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/shared/FormField'
 import { loginSchema, type LoginFormValues } from '@/features/auth/authSchemas'
 
-function getPostLoginPath(role: UserRole, isSetupComplete: boolean): string {
+export function getPostLoginPath(role: UserRole, isSetupComplete: boolean): string {
   if (role === UserRole.Admin && !isSetupComplete) return '/setup'
-  if (role === UserRole.Admin) return '/admin'
-  if (role === UserRole.Kitchen) return '/kitchen'
-  return '/dashboard'
+  if (role === UserRole.Waiter) return '/orders'
+  if (role === UserRole.Kitchen) return '/orders'
+  return '/dashboard' // Admin (setup complete) + Manager
 }
 
 export function LoginPage() {

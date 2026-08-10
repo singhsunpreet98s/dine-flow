@@ -3,15 +3,10 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAppSelector } from '@/app/hooks'
 import { UserRole } from '@/types/enums'
 
-function getRoleHomePath(role: UserRole): string {
-  switch (role) {
-    case UserRole.Admin:
-      return '/admin'
-    case UserRole.Kitchen:
-      return '/kitchen'
-    default:
-      return '/dashboard'
-  }
+export function getRoleHomePath(role: UserRole): string {
+  if (role === UserRole.Waiter) return '/orders'
+  if (role === UserRole.Kitchen) return '/orders'
+  return '/dashboard' // Admin + Manager
 }
 
 interface ProtectedRouteProps {

@@ -116,7 +116,9 @@ function DashboardRoutes() {
         <Route
           path="/orders"
           element={
-            <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter]}>
+            <ProtectedRoute
+              allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter, UserRole.Kitchen]}
+            >
               <OrdersPage />
             </ProtectedRoute>
           }
@@ -124,7 +126,9 @@ function DashboardRoutes() {
         <Route
           path="/orders/new"
           element={
-            <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter]}>
+            <ProtectedRoute
+              allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter, UserRole.Kitchen]}
+            >
               <AddOrderPage />
             </ProtectedRoute>
           }
@@ -132,7 +136,9 @@ function DashboardRoutes() {
         <Route
           path="/orders/:id/edit"
           element={
-            <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter]}>
+            <ProtectedRoute
+              allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter, UserRole.Kitchen]}
+            >
               <EditOrderPage />
             </ProtectedRoute>
           }
@@ -140,7 +146,9 @@ function DashboardRoutes() {
         <Route
           path="/orders/:id/bill"
           element={
-            <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter]}>
+            <ProtectedRoute
+              allowedRoles={[UserRole.Admin, UserRole.Manager, UserRole.Waiter, UserRole.Kitchen]}
+            >
               <BillPage />
             </ProtectedRoute>
           }

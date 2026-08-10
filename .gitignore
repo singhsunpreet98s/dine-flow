@@ -30,3 +30,4 @@ __blobstorage__/9a184db8-1cbc-43d9-bd85-a9c42177d2a2
 __azurite_db_table__.json
 __azurite_db_queue__.json
 __azurite_db_queue_extent__.json
+/.claude.json

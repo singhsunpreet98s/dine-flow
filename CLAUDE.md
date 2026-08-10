@@ -212,11 +212,56 @@ Use `_context.Entry(entity).Property("PropName").CurrentValue = value` to bypass
 - No `any` types in test files — use `unknown` + type assertions where needed
 - **RTK Query tests** — JSDOM lacks `Request`; add `node-fetch` polyfill at top of file, use isolated API with `fetchFn` injection, assert via selector (see `frontend.md` agent for complete pattern)
 
-## Custom Agents (Invoke via Agent tool)
+## Jira Workflow
 
-| Agent | When to use |
-|-------|------------|
-| `backend` | .NET Core API, SignalR, EF Core, FluentValidation, xUnit |
-| `frontend` | React components, Redux, RTK Query, Shadcn, Jest |
-| `code-reviewer` | DineFlow-specific code review with audit trail and real-time checks |
-| `orchestrator` | Any cross-cutting feature (new tile, new page, new alert) — decomposes into backend + frontend tasks and delegates to specialists in parallel |
+**Trigger phrases:** "use jira ticket", "DF-XX", or any reference matching `DF-\d+` or `SCRUM-\d+`.
+
+> `DF-XX` is the shorthand used in conversation — it maps to `SCRUM-XX` in Jira (cloud ID `4fc01b93-520d-4f4e-ba0b-6c88a0cf1fb2`, project key `SCRUM`).
+
+### When a Jira ticket is referenced, follow these steps in order:
+
+1. **Fetch the ticket** via `mcp__atlassian__getJiraIssue` using the resolved key (e.g. `DF-6` → `DF-6`). Read the summary, description (Ask + Acceptance Criteria), and issue type.
+
+2. **Create a branch off `main`** following the naming convention:
+   | Issue type | Branch pattern |
+   |---|---|
+   | Bug / Subtask | `bugfix/SCRUM-XX-short-description` |
+   | Story / Task / Epic | `feature/SCRUM-XX-short-description` |
+   - `short-description` = kebab-case slug of the ticket summary (3–5 words max).
+   - Example: `DF-6` "Persist sidebar state across refreshes" → `bugfix/SCRUM-6-persist-sidebar-state`
+
+3. **Transition the ticket to "In Progress"** via `mcp__atlassian__transitionJiraIssue` as soon as the branch is created and implementation begins.
+
+4. **Implement** the ticket on that branch, following all DineFlow conventions (audit trail, tests, no direct DB deletes, etc.).
+
+5. **Raise a PR** targeting `main` when implementation is complete, then **transition the ticket to "In Review"** via `mcp__atlassian__transitionJiraIssue`.
+
+---
+
+## Skills (`.claude/skills/`) — invoke with `/skill-name`
+
+Skills load their instruction set into the current Claude session. One brain, full context throughout. There are no standalone sub-agents — all work is done by Claude with the skill loaded.
+
+| Skill | Invoke | Purpose |
+|---|---|---|
+| `fullstack-developer` | `/fullstack-developer` | Full feature spanning backend + frontend — plans, implements in phases (backend → frontend → test audit → review), reports |
+| `backend` | `/backend` | Load DineFlow backend mode — .NET Core conventions, Result<T>, audit trail, SignalR, xUnit |
+| `frontend` | `/frontend` | Load DineFlow frontend mode — RTK Query, SignalR cache, forms, Jest/RTL |
+| `test-writer` | `/test-writer` | Audit test coverage and write missing tests for existing code |
+| `code-reviewer` | `/code-reviewer` | DineFlow-aware checklist — audit trail, lifecycle, TypeScript safety |
+| `create-jira-ticket` | `/create-jira-ticket` | Guided Jira ticket creation with ADF description |
+
+All skill files: `.claude/skills/<skill-name>/SKILL.md`
+
+---
+
+## When to use each skill
+
+| Situation | Use |
+|---|---|
+| Cross-cutting feature (backend + frontend + tests + review) | `/fullstack-developer` |
+| Backend-only work | `/backend` |
+| Frontend-only work | `/frontend` |
+| Write missing tests for files already built | `/test-writer` |
+| Review a diff or PR | `/code-reviewer` |
+| Create a Jira ticket | `/create-jira-ticket` |
