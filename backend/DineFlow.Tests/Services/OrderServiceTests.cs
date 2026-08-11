@@ -469,6 +469,166 @@ public class OrderServiceTests
         order.PaymentMode.Should().Be(PaymentMode.Cash);
     }
 
+    // ── AddItemsAsync ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Configures the mocks needed for every AddItemsAsync test — returns a
+    /// ready-to-use <see cref="AddItemsRequest"/> containing the given menu item.
+    /// </summary>
+    private AddItemsRequest SetupAddItemsMocks(Guid menuItemId, Guid orderId, Order order, bool setupSave = true)
+    {
+        _addItemsVal
+            .Setup(v => v.ValidateAsync(It.IsAny<AddItemsRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ValidResult());
+
+        _menuItems
+            .Setup(r => r.GetByIdAsync(menuItemId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MenuItem
+            {
+                Name = "Chai",
+                Price = 30m,
+                IsAvailable = true,
+                CreatedBy = "seed",
+                UpdatedBy = "seed"
+            });
+
+        _orders
+            .Setup(r => r.GetByIdWithItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+
+        if (setupSave)
+        {
+            _orders
+                .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+        }
+
+        return new AddItemsRequest(new[] { new CreateOrderItemRequest(menuItemId, 1, null) });
+    }
+
+    [Fact]
+    public async Task AddItemsAsync_WhenStatusIsPlaced_ReturnsSuccess()
+    {
+        var menuItemId = Guid.NewGuid();
+        var orderId    = Guid.NewGuid();
+        var order      = CreateOrder(orderId); // starts at Placed
+        var request    = SetupAddItemsMocks(menuItemId, orderId, order);
+
+        var result = await _sut.AddItemsAsync(orderId, request, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AddItemsAsync_WhenStatusIsPreparing_ReturnsSuccess()
+    {
+        var menuItemId = Guid.NewGuid();
+        var orderId    = Guid.NewGuid();
+        var order      = CreateOrder(orderId);
+        order.TransitionTo(OrderStatus.SentToKitchen);
+        order.TransitionTo(OrderStatus.Preparing);
+        var request = SetupAddItemsMocks(menuItemId, orderId, order);
+
+        var result = await _sut.AddItemsAsync(orderId, request, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AddItemsAsync_WhenStatusIsServed_ReturnsSuccess()
+    {
+        var menuItemId = Guid.NewGuid();
+        var orderId    = Guid.NewGuid();
+        var order      = CreateOrder(orderId);
+        order.TransitionTo(OrderStatus.SentToKitchen);
+        order.TransitionTo(OrderStatus.Preparing);
+        order.TransitionTo(OrderStatus.Prepared);
+        order.TransitionTo(OrderStatus.Served);
+        var request = SetupAddItemsMocks(menuItemId, orderId, order);
+
+        var result = await _sut.AddItemsAsync(orderId, request, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AddItemsAsync_WhenStatusIsBilled_ReturnsSuccess()
+    {
+        var menuItemId = Guid.NewGuid();
+        var orderId    = Guid.NewGuid();
+        var order      = CreateOrder(orderId);
+        order.TransitionTo(OrderStatus.Billed); // Placed → Billed is a valid shortcut
+        var request = SetupAddItemsMocks(menuItemId, orderId, order);
+
+        var result = await _sut.AddItemsAsync(orderId, request, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AddItemsAsync_WhenStatusIsPaid_ReturnsConflict()
+    {
+        var menuItemId = Guid.NewGuid();
+        var orderId    = Guid.NewGuid();
+        var order      = CreateOrder(orderId);
+        order.TransitionTo(OrderStatus.Billed);
+        order.TransitionTo(OrderStatus.Paid);
+        // SaveChanges should NOT be called for a locked order — omit setupSave
+        var request = SetupAddItemsMocks(menuItemId, orderId, order, setupSave: false);
+
+        var result = await _sut.AddItemsAsync(orderId, request, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorType.Should().Be(ResultError.Conflict);
+        result.Message.Should().ContainEquivalentOf("paid");
+    }
+
+    [Fact]
+    public async Task AddItemsAsync_WhenStatusIsClosed_ReturnsConflict()
+    {
+        var menuItemId = Guid.NewGuid();
+        var orderId    = Guid.NewGuid();
+        var order      = CreateOrder(orderId);
+        TransitionToClosedState(order);
+        var request = SetupAddItemsMocks(menuItemId, orderId, order, setupSave: false);
+
+        var result = await _sut.AddItemsAsync(orderId, request, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorType.Should().Be(ResultError.Conflict);
+        result.Message.Should().ContainEquivalentOf("paid");
+    }
+
+    [Fact]
+    public async Task AddItemsAsync_WhenOrderNotFound_ReturnsNotFound()
+    {
+        var menuItemId = Guid.NewGuid();
+        var orderId    = Guid.NewGuid();
+
+        _addItemsVal
+            .Setup(v => v.ValidateAsync(It.IsAny<AddItemsRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ValidResult());
+
+        _menuItems
+            .Setup(r => r.GetByIdAsync(menuItemId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MenuItem
+            {
+                Name = "Chai", Price = 30m, IsAvailable = true,
+                CreatedBy = "seed", UpdatedBy = "seed"
+            });
+
+        _orders
+            .Setup(r => r.GetByIdWithItemsAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+
+        var request = new AddItemsRequest(new[] { new CreateOrderItemRequest(menuItemId, 1, null) });
+
+        var result = await _sut.AddItemsAsync(orderId, request, Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorType.Should().Be(ResultError.NotFound);
+    }
+
     // ── AssignWaiterAsync ─────────────────────────────────────────────────────
 
     [Fact]

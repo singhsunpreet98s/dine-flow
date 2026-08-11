@@ -5,6 +5,7 @@ import { MenuItemSearch } from '@/features/orders/MenuItemSearch'
 import { OrderItemRow } from '@/features/orders/OrderItemRow'
 import type { MenuItemDto, CreateOrderItemRequest } from '@/types/api'
 import { CHANNEL_BADGE, ORDER_STATUS_LABEL } from '@/types/enums'
+import { isOrderEditable } from '@/features/orders/orderUtils'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 
@@ -84,6 +85,43 @@ export function EditOrderPage() {
 
   if (isLoading) return <div className="p-6"><LoadingSpinner /></div>
   if (isError || !order) return <div className="p-6"><ErrorMessage message="Order not found." /></div>
+
+  if (!isOrderEditable(order.status)) {
+    return (
+      <div className="p-6 space-y-4">
+        {/* Order summary — visible even when locked so staff can see what was ordered */}
+        <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold">{order.orderNumber}</span>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CHANNEL_BADGE[order.channel]}`}>
+              {order.channel}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {ORDER_STATUS_LABEL[order.status]}
+            </span>
+          </div>
+          {order.customerName && <p className="text-sm">{order.customerName}</p>}
+          <ul className="text-sm space-y-0.5">
+            {order.items.map((item) => (
+              <li key={item.id} className="flex justify-between">
+                <span>{item.menuItemName} &times; {item.quantity}</span>
+                <span className="text-muted-foreground">
+                  &#8377;{(item.unitPrice * item.quantity).toFixed(2)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm font-semibold text-right border-t border-border pt-2">
+            Total: &#8377;{order.totalAmount.toFixed(2)}
+          </p>
+        </div>
+        {/* Locked banner */}
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          This order has been paid and can no longer be edited.
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6">

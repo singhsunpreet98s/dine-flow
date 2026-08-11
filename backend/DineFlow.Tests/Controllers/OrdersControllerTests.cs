@@ -222,6 +222,43 @@ public class OrdersControllerTests : IClassFixture<DineFlowWebApplicationFactory
     }
 
     [Fact]
+    public async Task AddItems_WhenOrderIsPreparing_Returns200()
+    {
+        var id  = Guid.NewGuid();
+        var dto = MakeOrderDto(id) with { Status = OrderStatus.Preparing };
+        _orderMock
+            .Setup(s => s.AddItemsAsync(id, It.IsAny<AddItemsRequest>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<OrderDto>.Success(dto));
+
+        var request = new AddItemsRequest(
+            new[] { new CreateOrderItemRequest(Guid.NewGuid(), 1, null) });
+
+        var response = await _factory.CreateClientWithRole("Waiter")
+            .PatchAsJsonAsync($"/api/orders/{id}/items", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task AddItems_WhenOrderIsPaid_Returns409()
+    {
+        var id = Guid.NewGuid();
+        _orderMock
+            .Setup(s => s.AddItemsAsync(id, It.IsAny<AddItemsRequest>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<OrderDto>.Failure(
+                ResultError.Conflict,
+                "Cannot add items to an order that has already been paid."));
+
+        var request = new AddItemsRequest(
+            new[] { new CreateOrderItemRequest(Guid.NewGuid(), 1, null) });
+
+        var response = await _factory.CreateClientWithRole("Waiter")
+            .PatchAsJsonAsync($"/api/orders/{id}/items", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
     public async Task AddItems_AsKitchen_Returns403()
     {
         var request = new AddItemsRequest(
