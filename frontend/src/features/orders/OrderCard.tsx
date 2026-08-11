@@ -13,6 +13,7 @@ import { useOrderTimer } from '@/hooks/useOrderTimer'
 import { useUpdateOrderStatusMutation } from '@/features/orders/ordersApi'
 import { AssignWaiterButton } from '@/features/orders/AssignWaiterButton'
 import { formatInTz } from '@/lib/timezone'
+import { isOrderEditable } from '@/features/orders/orderUtils'
 
 interface OrderCardProps {
   order: OrderDto
@@ -126,7 +127,8 @@ export function OrderCard({ order }: OrderCardProps) {
     (CAN_ADVANCE[order.status]?.has(role) ?? false)
 
   const canEdit =
-    role === UserRole.Admin || role === UserRole.Manager || role === UserRole.Waiter
+    (role === UserRole.Admin || role === UserRole.Manager || role === UserRole.Waiter) &&
+    isOrderEditable(order.status)
 
   const canViewBill =
     (role === UserRole.Admin || role === UserRole.Manager || role === UserRole.Waiter) &&

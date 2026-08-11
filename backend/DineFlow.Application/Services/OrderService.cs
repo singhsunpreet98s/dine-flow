@@ -176,8 +176,8 @@ public class OrderService : IOrderService
         if (order is null)
             return Result<OrderDto>.Failure(ResultError.NotFound, $"Order {orderId} not found.");
 
-        if (order.Status != OrderStatus.Placed && order.Status != OrderStatus.SentToKitchen)
-            return Result<OrderDto>.Failure(ResultError.Conflict, $"Cannot add items to an order with status {order.Status}.");
+        if (order.Status == OrderStatus.Paid || order.Status == OrderStatus.Closed)
+            return Result<OrderDto>.Failure(ResultError.Conflict, "Cannot add items to an order that has already been paid.");
 
         foreach (var item in newItems)
             order.Items.Add(item);
