@@ -12,5 +12,7 @@ public interface IOrderRepository
     Task<bool> HasActiveOrderForRestaurantTableAsync(Guid restaurantTableId, CancellationToken ct = default);
     Task<IReadOnlyList<Order>> GetActiveOrdersForRestaurantTablesAsync(CancellationToken ct = default);
     Task AddAsync(Order order, CancellationToken ct = default);
+    Task AddOrderItemAsync(OrderItem orderItem, CancellationToken ct = default);
+    Task UpdateAsync(Order order, CancellationToken ct = default);
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

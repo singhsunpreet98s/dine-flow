@@ -14,7 +14,6 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.Channel).HasConversion<string>();
         builder.Property(o => o.TotalAmount).HasColumnType("decimal(18,2)");
         builder.Property(o => o.MemberCount).HasDefaultValue(1);
-        builder.Property(o => o.RowVersion).IsRowVersion();
         builder.HasQueryFilter(o => !o.IsDeleted);
 
         builder.HasOne(o => o.RestaurantTable)
