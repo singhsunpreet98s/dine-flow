@@ -38,8 +38,6 @@ public class Order : BaseEntity
         AssignedWaiterName = waiterName;
     }
 
-    public byte[] RowVersion { get; set; } = [];
-
     public void TransitionTo(OrderStatus newStatus)
     {
         if (!_validTransitions.TryGetValue(Status, out var allowed) || !allowed.Contains(newStatus))

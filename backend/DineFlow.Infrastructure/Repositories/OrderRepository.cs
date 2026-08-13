@@ -50,6 +50,12 @@ public class OrderRepository : IOrderRepository
     public async Task AddAsync(Order order, CancellationToken ct = default)
         => await _db.Orders.AddAsync(order, ct);
 
+    public Task UpdateAsync(Order order, CancellationToken ct = default)
+        => _db.SaveChangesAsync(ct);
+
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);
+
+    public async Task AddOrderItemAsync(OrderItem orderItem, CancellationToken ct = default) =>
+        await _db.OrderItems.AddAsync(orderItem, ct);
 }

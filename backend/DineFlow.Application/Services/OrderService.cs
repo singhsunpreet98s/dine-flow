@@ -144,12 +144,14 @@ public class OrderService : IOrderService
         if (!v.IsValid)
             return Result<OrderDto>.Failure(ResultError.Validation, string.Join("; ", v.Errors.Select(e => e.ErrorMessage)));
 
-        // Resolve and validate all menu items BEFORE loading the tracked Order.
-        // EF Core 9's identity-map fixup during subsequent queries on the same
-        // DbContext can overwrite the Order entity's original-value snapshot
-        // (including RowVersion), causing the optimistic-concurrency WHERE clause
-        // to use a stale value and affect 0 rows.  Loading the Order last — right
-        // before we modify and save — keeps the tracked entity clean.
+        // Load Order with fresh tracking AFTER all menu-item queries are done.
+        var order = await _orders.GetByIdWithItemsAsync(orderId, ct);
+        if (order is null)
+            return Result<OrderDto>.Failure(ResultError.NotFound, $"Order {orderId} not found.");
+
+        if (order.Status == OrderStatus.Paid || order.Status == OrderStatus.Closed)
+            return Result<OrderDto>.Failure(ResultError.Conflict, "Cannot add items to an order that has already been paid.");
+        
         decimal addedTotal = 0m;
         var newItems = new List<OrderItem>();
         foreach (var item in request.Items)
@@ -157,10 +159,9 @@ public class OrderService : IOrderService
             var menuItem = await _menuItems.GetByIdAsync(item.MenuItemId, ct);
             if (menuItem is null || !menuItem.IsAvailable)
                 return Result<OrderDto>.Failure(ResultError.Validation, $"Menu item {item.MenuItemId} not found or unavailable.");
-
             newItems.Add(new OrderItem
             {
-                OrderId = orderId,
+                Order = order,
                 MenuItemId = item.MenuItemId,
                 Quantity = item.Quantity,
                 UnitPrice = menuItem.Price,
@@ -171,16 +172,10 @@ public class OrderService : IOrderService
             addedTotal += menuItem.Price * item.Quantity;
         }
 
-        // Load Order with fresh tracking AFTER all menu-item queries are done.
-        var order = await _orders.GetByIdWithItemsAsync(orderId, ct);
-        if (order is null)
-            return Result<OrderDto>.Failure(ResultError.NotFound, $"Order {orderId} not found.");
-
-        if (order.Status == OrderStatus.Paid || order.Status == OrderStatus.Closed)
-            return Result<OrderDto>.Failure(ResultError.Conflict, "Cannot add items to an order that has already been paid.");
-
         foreach (var item in newItems)
-            order.Items.Add(item);
+        {
+            await _orders.AddOrderItemAsync(item, ct);
+        }
 
         order.TotalAmount += addedTotal;
         order.UpdatedBy = performedBy.ToString();
@@ -197,7 +192,7 @@ public class OrderService : IOrderService
         };
         await _auditLogs.AddAsync(auditLog, ct);
 
-        await _orders.SaveChangesAsync(ct);
+        await _orders.UpdateAsync(order, ct);
 
         return Result<OrderDto>.Success(ToDto(order));
     }
@@ -230,7 +225,6 @@ public class OrderService : IOrderService
             order.Notes = request.Note;
 
         order.UpdatedBy = performedBy.ToString();
-        order.UpdatedAt = DateTime.UtcNow;
 
         await _auditLogs.AddAsync(new AuditLog
         {
@@ -246,7 +240,7 @@ public class OrderService : IOrderService
             UpdatedBy = performedBy.ToString(),
         }, ct);
 
-        await _orders.SaveChangesAsync(ct);
+        await _orders.UpdateAsync(order, ct);
 
         if (order.RestaurantTableId.HasValue &&
             (request.Status == OrderStatus.Paid || request.Status == OrderStatus.Closed))
@@ -281,13 +275,13 @@ public class OrderService : IOrderService
 
     public async Task<Result<OrderDto>> AssignWaiterAsync(Guid orderId, Guid waiterId, Guid performedBy, CancellationToken ct = default)
     {
-        var order = await _orders.GetByIdWithItemsAsync(orderId, ct);
-        if (order is null)
-            return Result<OrderDto>.Failure(ResultError.NotFound, $"Order {orderId} not found.");
-
         var waiter = await _users.GetByIdAsync(waiterId, ct);
         if (waiter is null || waiter.Role != UserRole.Waiter)
             return Result<OrderDto>.Failure(ResultError.Validation, "Specified user is not a Waiter.");
+
+        var order = await _orders.GetByIdWithItemsAsync(orderId, ct);
+        if (order is null)
+            return Result<OrderDto>.Failure(ResultError.NotFound, $"Order {orderId} not found.");
 
         var previousWaiterId = order.AssignedWaiterId;
 
@@ -305,7 +299,7 @@ public class OrderService : IOrderService
             UpdatedBy = performedBy.ToString(),
         }, ct);
 
-        await _orders.SaveChangesAsync(ct);
+        await _orders.UpdateAsync(order, ct);
 
         var dto = ToDto(order);
         await _hub.SendToGroupAsync("manager", "WaiterAssigned", new { order = dto }, ct);

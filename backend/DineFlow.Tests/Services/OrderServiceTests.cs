@@ -7,6 +7,7 @@ using DineFlow.Domain.Interfaces;
 using FluentAssertions;
 using FluentValidation;
 using FluentValidation.Results;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace DineFlow.Tests.Services;
@@ -28,7 +29,6 @@ public class OrderServiceTests
     private readonly Mock<IValidator<CreateOrderRequest>> _createVal = new();
     private readonly Mock<IValidator<AddItemsRequest>> _addItemsVal = new();
     private readonly Mock<IValidator<UpdateOrderStatusRequest>> _updateStatusVal = new();
-
     private readonly OrderService _sut;
 
     public OrderServiceTests()
@@ -406,8 +406,8 @@ public class OrderServiceTests
             .ReturnsAsync(order);
 
         _orders
-            .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
+            .Setup(r => r.UpdateAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         // Valid transition: Placed → SentToKitchen
         var request = new UpdateOrderStatusRequest(OrderStatus.SentToKitchen);
@@ -453,8 +453,8 @@ public class OrderServiceTests
             .ReturnsAsync(order);
 
         _orders
-            .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
+            .Setup(r => r.UpdateAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         // Billed → Paid with Cash payment mode
         var request = new UpdateOrderStatusRequest(OrderStatus.Paid, PaymentMode.Cash);
@@ -499,8 +499,8 @@ public class OrderServiceTests
         if (setupSave)
         {
             _orders
-                .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(1);
+                .Setup(r => r.UpdateAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
         }
 
         return new AddItemsRequest(new[] { new CreateOrderItemRequest(menuItemId, 1, null) });
@@ -635,12 +635,27 @@ public class OrderServiceTests
     public async Task AssignWaiterAsync_WhenOrderNotFound_ReturnsNotFound()
     {
         var orderId = Guid.NewGuid();
+        var waiterId = Guid.NewGuid();
+
+        // Waiter is resolved before the order — provide a valid waiter so the service
+        // reaches the order lookup (which returns null → NotFound).
+        _users
+            .Setup(r => r.GetByIdAsync(waiterId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AppUser
+            {
+                Name = "Valid Waiter",
+                Email = "waiter@dineflow.com",
+                Role = UserRole.Waiter,
+                PasswordHash = "hashed",
+                CreatedBy = "test",
+                UpdatedBy = "test"
+            });
 
         _orders
             .Setup(r => r.GetByIdWithItemsAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
 
-        var result = await _sut.AssignWaiterAsync(orderId, Guid.NewGuid(), Guid.NewGuid());
+        var result = await _sut.AssignWaiterAsync(orderId, waiterId, Guid.NewGuid());
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorType.Should().Be(ResultError.NotFound);
@@ -727,8 +742,8 @@ public class OrderServiceTests
             .ReturnsAsync(waiter);
 
         _orders
-            .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
+            .Setup(r => r.UpdateAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         var result = await _sut.AssignWaiterAsync(orderId, waiterId, performedBy);
 
@@ -765,4 +780,5 @@ public class OrderServiceTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
 }
