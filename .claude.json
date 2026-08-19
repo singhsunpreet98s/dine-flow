@@ -9,7 +9,7 @@
       "env": {
         "JIRA_URL": "https://deltaverse.atlassian.net/",
         "JIRA_EMAIL": "sunpreetmindfire@gmail.com",
-        "JIRA_API_TOKEN": "ATATT3xFfGF0G0XZttSg95KAFx0UOJIVtQhFy7U-4cevrjYByei-oOeAG1DDY_gw8H8ZoWS2MQXS5WtfTKum7eA9hSl4vG0DmH_WgMl90y7Drl-sHQjoNV4FQrpvMj5WobsqsbDXRRV3O82q4CSj735cktaxQpIKYcF7BE9dAElSuB3JSV79g10=EF04A0B2"
+        "JIRA_API_TOKEN": ""
       }
     }
   }
